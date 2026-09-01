@@ -1,4 +1,4 @@
-﻿# 🅿️ MY Service Parking
+## 🅿️ MY Service Parking
 
 > Sistema web de controle de estacionamento para motoristas **rotativos** e **mensalistas**, desenvolvido como projeto acadêmico de Arquitetura e Projeto de Software.
 
