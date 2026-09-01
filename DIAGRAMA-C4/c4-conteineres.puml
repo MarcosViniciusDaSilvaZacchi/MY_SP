@@ -1,0 +1,54 @@
+@startuml C4_Container_MyServiceParking
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Diagrama de Contêineres (C4 Nível 2) - MY Service Parking
+
+Person(atendente, "Atendente/Administrador", "Opera o estacionamento e consulta relatórios.")
+
+System_Boundary(myServiceParking, "MY Service Parking") {
+
+    Container(spa, "Front-end SPA", "Vue.js, Vue Router, Axios", "Views para atendentes e administradores: Entrada, Saída, Mensalistas, Vagas, Relatórios, Usuários.")
+
+    Container(gateway, "API Gateway", "Node.js + Express", "Ponto único de entrada, roteamento, autenticação central e CORS.")
+
+    Container(authService, "auth-service", "Node.js + Express", "Login, senha (hash) e perfis de acesso (RN-19, RN-20).")
+    Container(estacionamentoService, "estacionamento-service", "Node.js + Express", "Entrada, saída e permanência de veículos.")
+    Container(mensalistaService, "mensalista-service", "Node.js + Express", "Cadastro de mensalistas, placas vinculadas e adimplência.")
+    Container(pagamentoService, "pagamento-service", "Node.js + Express", "Cálculo de tarifa, carência e confirmação de pagamento.")
+    Container(vagaService, "vaga-service", "Node.js + Express", "Cadastro, tipos e estados de vagas por andar.")
+    Container(integracaoDispositivos, "integração-dispositivos", "Node.js + Express", "Fase 2: adapters para sensores, cancelas, painéis LED.")
+
+    ContainerDb(dbAuth, "DB Auth", "PostgreSQL/MySQL", "Usuários e perfis.")
+    ContainerDb(dbEstacionamento, "DB Estacionamento", "PostgreSQL/MySQL", "Movimentações (ABERTA, AGUARDANDO_PAGAMENTO, FINALIZADA, CANCELADA).")
+    ContainerDb(dbMensalista, "DB Mensalistas", "PostgreSQL/MySQL", "Mensalistas, placas, status financeiro.")
+    ContainerDb(dbPagamento, "DB Pagamentos", "PostgreSQL/MySQL", "Pagamentos e tabela de preços.")
+    ContainerDb(dbVaga, "DB Vagas", "PostgreSQL/MySQL", "Vagas, andares e tipos especiais.")
+}
+
+System_Ext(dispositivosFisicos, "Dispositivos físicos (Fase 2)", "Sensores, cancelas, câmeras OCR, painéis LED.")
+
+Rel(atendente, spa, "Usa", "HTTPS")
+Rel(spa, gateway, "Consome API", "HTTP/REST, JSON")
+
+Rel(gateway, authService, "Roteia autenticação", "REST")
+Rel(gateway, estacionamentoService, "Roteia entrada/saída", "REST")
+Rel(gateway, mensalistaService, "Roteia cadastro/consulta", "REST")
+Rel(gateway, pagamentoService, "Roteia cálculo/pagamento", "REST")
+Rel(gateway, vagaService, "Roteia vagas", "REST")
+
+Rel(estacionamentoService, mensalistaService, "Consulta adimplência por placa", "REST")
+Rel(estacionamentoService, pagamentoService, "Solicita cálculo de tarifa", "REST")
+Rel(pagamentoService, estacionamentoService, "Confirma pagamento p/ encerrar movimentação", "REST")
+Rel(estacionamentoService, integracaoDispositivos, "Comando de cancela (Fase 2)", "REST/eventos")
+Rel(vagaService, integracaoDispositivos, "Eventos de ocupação de sensores (Fase 2)", "REST/eventos")
+
+Rel(authService, dbAuth, "Lê/grava", "SQL")
+Rel(estacionamentoService, dbEstacionamento, "Lê/grava", "SQL")
+Rel(mensalistaService, dbMensalista, "Lê/grava", "SQL")
+Rel(pagamentoService, dbPagamento, "Lê/grava", "SQL")
+Rel(vagaService, dbVaga, "Lê/grava", "SQL")
+
+Rel(integracaoDispositivos, dispositivosFisicos, "Envia comandos / recebe eventos", "Protocolo do dispositivo")
+
+SHOW_LEGEND()
+@enduml
