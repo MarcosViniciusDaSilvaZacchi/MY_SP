@@ -622,3 +622,65 @@ docker compose up --build
 ---
 
 *Desenvolvido por Marcos Vinícius e Yan — T2ESOFT05NB | Projeto e Arquitetura de Software | 2026*
+
+---
+
+## ⚠️ SEPARAÇÃO EM MICROSERVIÇOS — OBRIGATÓRIO
+
+> Esta seção documenta explicitamente a separação obrigatória em microserviços do projeto.
+> Cada serviço é **independente**: roda em porta própria, tem banco de dados próprio e
+> **nunca acessa diretamente o banco de outro serviço**.
+
+### Mapa de Microserviços
+
+| Serviço | Porta | Responsabilidade | Rotas implementadas |
+|---------|-------|------------------|---------------------|
+| **gateway** | 3000 | Ponto único de entrada: CORS, JWT guard, proxy | `/api/*` → repassa para o serviço correto |
+| **auth-service** | 3001 | Autenticação JWT, perfis (ADMIN/OPERADOR) | `POST /auth/login` · `GET /auth/me` |
+| **estacionamento-service** | 3002 | Entrada, saída, permanência, movimentações | `POST /entradas` · `GET /movimentacoes/aberta` · `POST /saidas` · `GET /relatorios/resumo` |
+| **mensalista-service** | 3003 | Cadastro, adimplência e status de mensalistas | `GET /mensalistas` · `POST /mensalistas` · `GET /mensalistas/placa/:placa` · `PATCH /mensalistas/:id` |
+| **pagamento-service** | 3004 | Cálculo de tarifa (R$ 8/h, carência 10 min), registro | `POST /pagamentos/calcular` · `POST /pagamentos` · `GET /pagamentos` |
+| **vaga-service** | 3005 | Estado das vagas, tipos especiais, disponibilidade | `GET /vagas` · `GET /vagas/disponibilidade` · `PATCH /vagas/:id/status` |
+
+### Comunicação entre Microserviços
+
+```
+                  ┌─────────────────────────────────────────────┐
+                  │              API GATEWAY :3000              │
+                  │  JWT Guard → valida token em TODAS rotas    │
+                  └──────┬────────┬────────┬──────┬─────┬──────┘
+                         │        │        │      │     │
+              /auth  /entradas /mensalistas /pagamentos /vagas
+                │        │        │      │     │
+           :3001     :3002    :3003   :3004  :3005
+         auth-svc  estacion. mensali. pagam. vaga-svc
+                       │        ↑
+                       └────────┘
+                    estacionamento-service consulta
+                    mensalista-service via HTTP
+                    para verificar adimplência
+                    ao registrar uma entrada
+```
+
+### Regras de isolamento (invioláveis)
+
+- ❌ Nenhum serviço acessa o **banco de dados** de outro serviço
+- ❌ O **front-end** não contém regra de negócio (não calcula tarifa, não decide acesso)
+- ✅ Toda comunicação entre serviços ocorre via **HTTP REST**
+- ✅ O **gateway** é o único ponto de contato com o front-end
+- ✅ Cada serviço tem seu próprio **`.env`** com variáveis independentes
+
+### Status de implementação
+
+| Serviço | Rotas | Banco | Status |
+|---------|-------|-------|--------|
+| gateway | ✅ Completo | — | ✅ Funcional |
+| auth-service | ✅ Completo | 🔄 In-memory | ✅ Funcional |
+| estacionamento-service | ✅ Completo | 🔄 In-memory | ✅ Funcional |
+| mensalista-service | ✅ Completo | 🔄 In-memory | ✅ Funcional |
+| pagamento-service | ✅ Completo | 🔄 In-memory | ✅ Funcional |
+| vaga-service | ✅ Completo | 🔄 In-memory | ✅ Funcional |
+
+> 🔄 **In-memory**: dados armazenados em arrays JavaScript enquanto banco de dados não está integrado.
+> Os dados são perdidos ao reiniciar o serviço. Integração com PostgreSQL/MySQL é a próxima etapa.
+
