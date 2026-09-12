@@ -238,53 +238,65 @@ VAGA_SERVICE_URL=http://localhost:3005
 
 ## 6. Rodando o projeto
 
-### 🖥️ Modo Manual — 3 Terminais (desenvolvimento do dia a dia)
-
-Abra **3 terminais separados** no VS Code (`Ctrl + Shift + `` ` ```) e rode cada comando em um:
-
-**Terminal 1 — Auth Service:**
-```bash
-cd services/auth-service
-npm run dev
-```
-> Deve aparecer: `[Auth Service] Rodando na porta 3001`
-
-**Terminal 2 — API Gateway:**
-```bash
-cd gateway
-npm run dev
-```
-> Deve aparecer: `[Gateway] Rodando na porta 3000`
-
-**Terminal 3 — Frontend:**
-```bash
-cd frontend
-npm run dev
-```
-> Deve aparecer algo como: `VITE v6.x.x ready in xxx ms` e a URL `http://localhost:5173`
-
-Abra o navegador em **http://localhost:5173**
-
-**Credenciais de teste:**
-
-| Perfil | Email | Senha |
-|--------|-------|-------|
-| Administrador | `admin@myparking.com` | `admin123` |
-| Operador | `operador@myparking.com` | `op123` |
+O projeto agora tem **7 processos** para rodar (5 microserviços + gateway + frontend).
 
 ---
 
-### 🐳 Modo Docker — Tudo de uma vez
+### ⚡ Opção A — Script automático (recomendado)
 
-> Certifique-se que o **Docker Desktop está aberto e rodando**.
+Rode tudo com **um único comando** no PowerShell, na raiz do projeto:
 
-Na raiz do projeto:
+```powershell
+$ROOT = (Get-Location).Path
+$servicos = @(
+    @{dir="services\auth-service";           label="auth-service"},
+    @{dir="services\estacionamento-service";  label="estacionamento-service"},
+    @{dir="services\mensalista-service";      label="mensalista-service"},
+    @{dir="services\pagamento-service";       label="pagamento-service"},
+    @{dir="services\vaga-service";            label="vaga-service"},
+    @{dir="gateway";                          label="gateway"}
+)
+foreach ($s in $servicos) {
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$ROOT\$($s.dir)'; npm run dev" -WindowStyle Normal
+}
+Start-Sleep 4
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$ROOT\frontend'; npm run dev" -WindowStyle Normal
+Write-Host "Todos os servicos iniciados! Acesse: http://localhost:5173"
+```
+
+Isso abre **7 janelas PowerShell**, uma por serviço. Quando todas mostrarem "Rodando na porta X", acesse **http://localhost:5173**.
+
+---
+
+### 🖥️ Opção B — 7 Terminais no VS Code
+
+No VS Code use `Ctrl + Shift + `` ` `` ` para abrir um novo terminal. Abra 7 e rode um comando em cada:
+
+| Terminal | Comando | Porta | Sinal de sucesso |
+|----------|---------|-------|-----------------|
+| 1 | `cd services/auth-service; npm run dev` | 3001 | `[Auth Service] Rodando na porta 3001` |
+| 2 | `cd services/estacionamento-service; npm run dev` | 3002 | `[estacionamento-service] Rodando na porta 3002` |
+| 3 | `cd services/mensalista-service; npm run dev` | 3003 | `[mensalista-service] Rodando na porta 3003` |
+| 4 | `cd services/pagamento-service; npm run dev` | 3004 | `[pagamento-service] Rodando na porta 3004` |
+| 5 | `cd services/vaga-service; npm run dev` | 3005 | `[vaga-service] Rodando na porta 3005` |
+| 6 | `cd gateway; npm run dev` | 3000 | `[Gateway] Rodando na porta 3000` |
+| 7 | `cd frontend; npm run dev` | 5173 | `VITE ready → http://localhost:5173` |
+
+> 💡 **Dica:** No painel de terminais do VS Code, clique no ícone `+` para abrir cada novo terminal.
+
+Acesse **http://localhost:5173** no navegador.
+
+---
+
+### 🐳 Opção C — Docker Compose (tudo de uma vez)
+
+> O **Docker Desktop** precisa estar instalado e aberto. Veja a seção 1 deste guia.
 
 ```bash
 docker compose up --build
 ```
 
-Aguarde o build (pode demorar ~2 min na primeira vez). Quando aparecer que todos os serviços subiram:
+Aguarde o build (~2 min na primeira vez). Quando todos os containers subirem:
 
 | Serviço | Endereço |
 |---------|----------|
@@ -296,7 +308,7 @@ Aguarde o build (pode demorar ~2 min na primeira vez). Quando aparecer que todos
 | 💳 pagamento-service | http://localhost:3004 |
 | 🅿️ vaga-service | http://localhost:3005 |
 
-Para parar:
+Para parar tudo:
 ```bash
 Ctrl + C
 docker compose down
@@ -304,25 +316,40 @@ docker compose down
 
 ---
 
+### 🔑 Credenciais de teste
+
+| Perfil | Email | Senha | Acesso |
+|--------|-------|-------|--------|
+| Administrador | `admin@myparking.com` | `admin123` | Todas as telas |
+| Operador | `operador@myparking.com` | `op123` | Entrada, Saída, Mensalistas, Vagas |
+
+---
+
 ### ✅ Verificando se está tudo funcionando
 
-Abra o **Thunder Client** (ou qualquer navegador) e teste:
+Abra o **Thunder Client** no VS Code e teste:
 
+**1. Health check:**
 ```
 GET http://localhost:3000/health
 ```
+Esperado: `{ "status": "ok", "service": "gateway" }`
 
-Deve retornar:
-```json
-{ "status": "ok", "service": "gateway" }
-```
-
+**2. Login:**
 ```
 POST http://localhost:3000/api/auth/login
-Body: { "email": "admin@myparking.com", "senha": "admin123" }
+Body JSON: { "email": "admin@myparking.com", "senha": "admin123" }
 ```
+Esperado: objeto com `token` JWT.
 
-Deve retornar um `token` JWT. Se retornou — **tudo funcionando!** ✅
+**3. Vagas (rota protegida):**
+```
+GET http://localhost:3000/api/vagas
+Header: Authorization: Bearer <token-do-passo-2>
+```
+Esperado: array com 20 vagas.
+
+Se tudo retornou corretamente — **todos os microserviços estão funcionando!** ✅
 
 ---
 
