@@ -374,9 +374,11 @@ findByEmail()
 
 ---
 
-## 7. Diagrama de Classes
+## 7. Diagrama de Classes (C4 Nível 4 — Código)
 
-Classes do domínio de negócio conforme o modelo C4. Cada classe corresponde a entidades que serão persistidas no banco de dados de seu respectivo microserviço.
+Classes do domínio de negócio conforme o modelo C4 (Nível 4 — Código / Classes). Cada classe corresponde a entidades manipuladas pelos respectivos microsserviços e persistidas em seus bancos de dados independentes.
+
+> O diagrama-fonte em PlantUML (.puml) completo está disponível em [`DIAGRAMA-C4/c4-codigo.puml`](./DIAGRAMA-C4/c4-codigo.puml) e [`c4-classes.puml`](./DIAGRAMA-C4/c4-classes.puml).
 
 ```mermaid
 classDiagram
@@ -584,21 +586,40 @@ MY_SP/
 - npm 10+
 - Docker + Docker Compose (opcional)
 
-### Opção 1 — Desenvolvimento Local
+### Opção 1 — Desenvolvimento Local (Sem Docker)
 
-```bash
-# Terminal 1 — auth-service
-cd services/auth-service
-npm run dev        # porta 3001
+Você pode rodar tudo com **um único comando** no terminal PowerShell na raiz do projeto (`MY_SP`):
 
-# Terminal 2 — API Gateway
-cd gateway
-npm run dev        # porta 3000
-
-# Terminal 3 — Frontend
-cd frontend
-npm run dev        # http://localhost:5173
+```powershell
+$ROOT = (Get-Location).Path
+$servicos = @(
+    @{dir="services\auth-service";           label="auth-service"},
+    @{dir="services\estacionamento-service";  label="estacionamento-service"},
+    @{dir="services\mensalista-service";      label="mensalista-service"},
+    @{dir="services\pagamento-service";       label="pagamento-service"},
+    @{dir="services\vaga-service";            label="vaga-service"},
+    @{dir="gateway";                          label="gateway"}
+)
+foreach ($s in $servicos) {
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$ROOT\$($s.dir)'; npm run dev" -WindowStyle Normal
+}
+Start-Sleep 4
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$ROOT\frontend'; npm run dev" -WindowStyle Normal
 ```
+
+Ou abrir 7 terminais no VS Code e executar `npm run dev` nas respectivas pastas:
+
+| Processo | Diretório | Comando | Porta |
+|---|---|---|---|
+| **1. auth-service** | `services/auth-service` | `npm run dev` | 3001 |
+| **2. estacionamento-service** | `services/estacionamento-service` | `npm run dev` | 3002 |
+| **3. mensalista-service** | `services/mensalista-service` | `npm run dev` | 3003 |
+| **4. pagamento-service** | `services/pagamento-service` | `npm run dev` | 3004 |
+| **5. vaga-service** | `services/vaga-service` | `npm run dev` | 3005 |
+| **6. API Gateway** | `gateway` | `npm run dev` | 3000 |
+| **7. Front-end SPA** | `frontend` | `npm run dev` | 5173 (http://localhost:5173) |
+
+> 💡 Consulte o guia passo a passo completo em [`READMEZERO.md`](./READMEZERO.md).
 
 **Credenciais de teste:**
 
