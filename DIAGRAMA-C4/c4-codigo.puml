@@ -1,0 +1,235 @@
+@startuml C4_Code_MyServiceParking
+title Diagrama de Código / Classes (C4 Nível 4) - MY Service Parking
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam roundcorner 8
+hide circle
+skinparam class {
+    BackgroundColor White
+    BorderColor #2C3E50
+    ArrowColor #2C3E50
+}
+
+package "gateway" <<Rectangle>> {
+    class AuthMiddleware {
+        +verificarJwt(req: Request, res: Response, next: NextFunction): void
+    }
+}
+
+package "auth-service" <<Rectangle>> {
+    class AuthController {
+        -users: Usuario[]
+        -JWT_SECRET: String
+        -JWT_EXPIRES_IN: String
+        +login(req: Request, res: Response): Response
+        +me(req: Request, res: Response): Response
+    }
+
+    class Usuario {
+        +id: int
+        +nome: String
+        +email: String
+        +senhaHash: String
+        +perfil: Perfil
+        +login(email: String, senha: String): String
+        +verificarToken(token: String): Object
+    }
+
+    enum Perfil <<enumeration>> {
+        ADMIN
+        OPERADOR
+    }
+
+    class JwtService {
+        +sign(payload: Object, secret: String, options: Object): String
+        +verify(token: String, secret: String): Object
+    }
+
+    class BcryptUtil {
+        +hashSync(senha: String, saltRounds: int): String
+        +compareSync(senha: String, hash: String): Boolean
+    }
+
+    Usuario --> Perfil
+    AuthController ..> Usuario : autentica / consulta
+    AuthController ..> JwtService : gera token
+    AuthController ..> BcryptUtil : valida hash
+}
+
+package "estacionamento-service" <<Rectangle>> {
+    class EstacionamentoController {
+        -movimentacoes: Movimentacao[]
+        -MENSALISTA_URL: String
+        +listarEntradas(req: Request, res: Response): void
+        +registrarEntrada(req: Request, res: Response): Promise<Response>
+        +buscarAberta(req: Request, res: Response): Response
+        +registrarSaida(req: Request, res: Response): Response
+        +resumo(req: Request, res: Response): void
+        -verificarMensalista(placa: String): Promise<Mensalista>
+    }
+
+    class Movimentacao {
+        +id: String
+        +placa: String
+        +tipo: TipoMovimentacao
+        +dataHoraEntrada: DateTime
+        +dataHoraSaida: DateTime
+        +status: StatusMovimentacao
+        +origem: String
+        +autorizado: Boolean
+        +mensalistaNome: String
+        +permanenciaMinutos: int
+        +calcularPermanenciaMin(): int
+        +finalizar(): void
+    }
+
+    enum TipoMovimentacao <<enumeration>> {
+        ROTATIVO
+        MENSALISTA
+    }
+
+    enum StatusMovimentacao <<enumeration>> {
+        ABERTA
+        AGUARDANDO_PAGAMENTO
+        FINALIZADA
+        CANCELADA
+    }
+
+    Movimentacao --> TipoMovimentacao
+    Movimentacao --> StatusMovimentacao
+    EstacionamentoController --> Movimentacao : gerencia
+}
+
+package "mensalista-service" <<Rectangle>> {
+    class MensalistaController {
+        -mensalistas: Mensalista[]
+        +listar(req: Request, res: Response): void
+        +buscarPorPlaca(req: Request, res: Response): Response
+        +cadastrar(req: Request, res: Response): Response
+        +atualizar(req: Request, res: Response): Response
+    }
+
+    class Mensalista {
+        +id: String
+        +nome: String
+        +cpf: String
+        +email: String
+        +placa: String
+        +vencimento: Date
+        +status: StatusMensalista
+        +planoMensal: float
+        +verificarAdimplencia(): Boolean
+    }
+
+    enum StatusMensalista <<enumeration>> {
+        EM_DIA
+        INADIMPLENTE
+        BLOQUEADO
+        INATIVO
+    }
+
+    Mensalista --> StatusMensalista
+    MensalistaController --> Mensalista : gerencia
+}
+
+package "pagamento-service" <<Rectangle>> {
+    class PagamentoController {
+        -VALOR_HORA: float = 8.00
+        -CARENCIA_MINUTOS: int = 10
+        -pagamentos: Pagamento[]
+        +calcular(req: Request, res: Response): Response
+        +registrar(req: Request, res: Response): Response
+        +listar(req: Request, res: Response): void
+        -calcularValor(permanenciaMinutos: int): float
+    }
+
+    class Pagamento {
+        +id: String
+        +movimentacaoId: String
+        +forma: FormaPagamento
+        +valorCalculado: float
+        +valorPago: float
+        +troco: float
+        +status: StatusPagamento
+        +dataHora: DateTime
+        +calcularValor(min: int, tabela: TabelaPreco): float
+        +confirmar(): void
+    }
+
+    class TabelaPreco {
+        +id: String
+        +descricao: String
+        +valorPorHora: float
+        +carenciaMinutos: int
+        +vigenciaInicio: Date
+        +vigenciaFim: Date
+        +aplicarCarencia(min: int): float
+    }
+
+    enum FormaPagamento <<enumeration>> {
+        DINHEIRO
+        CARTAO
+        PIX
+    }
+
+    enum StatusPagamento <<enumeration>> {
+        PENDENTE
+        CONFIRMADO
+        CANCELADO
+    }
+
+    Pagamento --> FormaPagamento
+    Pagamento --> StatusPagamento
+    Pagamento ..> TabelaPreco : aplica regras
+    PagamentoController --> Pagamento : registra
+}
+
+package "vaga-service" <<Rectangle>> {
+    class VagaController {
+        -vagas: Vaga[]
+        -TIPOS_POR_ANDAR: String[]
+        -STATUS_SEED: String[]
+        +listar(req: Request, res: Response): void
+        +disponibilidade(req: Request, res: Response): void
+        +atualizarStatus(req: Request, res: Response): Response
+    }
+
+    class Vaga {
+        +id: String
+        +codigo: String
+        +andar: int
+        +tipo: TipoVaga
+        +status: StatusVaga
+        +ocupar(): void
+        +liberar(): void
+        +bloquear(): void
+    }
+
+    enum TipoVaga <<enumeration>> {
+        COMUM
+        PCD
+        IDOSO
+        GESTANTE
+        ELETRICO
+    }
+
+    enum StatusVaga <<enumeration>> {
+        LIVRE
+        OCUPADA
+        INDISPONIVEL
+    }
+
+    Vaga --> TipoVaga
+    Vaga --> StatusVaga
+    VagaController --> Vaga : gerencia
+}
+
+' Relacionamentos entre microserviços e componentes
+AuthMiddleware ..> JwtService : valida tokens
+EstacionamentoController ..> MensalistaController : consulta adimplencia via REST [placa]
+Movimentacao "1" ..> "0..1" Pagamento : referencia por movimentacaoId
+
+@enduml
+

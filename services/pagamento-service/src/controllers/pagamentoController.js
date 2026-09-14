@@ -1,5 +1,5 @@
 // ──────────────────────────────────────────────────────────────────
-// Pagamento Controller — dados em memoria (sem banco ainda)
+// Pagamento Controller — dados em memoria
 // Regra de tarifa: R$ 8,00/hora | carencia de 10 minutos
 // ──────────────────────────────────────────────────────────────────
 
@@ -11,26 +11,30 @@ const pagamentos = [];
 function calcularValor(permanenciaMinutos) {
   if (permanenciaMinutos <= CARENCIA_MINUTOS) return 0;
   const minutosCobraveis = permanenciaMinutos - CARENCIA_MINUTOS;
-  const horas = Math.ceil(minutosCobraveis / 60);
+  const horas = Math.max(1, Math.ceil(minutosCobraveis / 60));
   return parseFloat((horas * VALOR_HORA).toFixed(2));
 }
 
-// POST /pagamentos/calcular  { movimentacaoId, permanenciaMinutos }
+// POST /pagamentos/calcular  { movimentacaoId, permanenciaMinutos / minutos }
 exports.calcular = (req, res) => {
-  const { movimentacaoId, permanenciaMinutos } = req.body;
+  const { movimentacaoId, permanenciaMinutos, minutos } = req.body;
+  const min = permanenciaMinutos !== undefined ? permanenciaMinutos : minutos;
 
-  if (permanenciaMinutos === undefined) {
+  if (min === undefined) {
     return res.status(400).json({ error: 'permanenciaMinutos obrigatorio' });
   }
 
-  const dentroCarencia = permanenciaMinutos <= CARENCIA_MINUTOS;
-  const valorCalculado = calcularValor(Number(permanenciaMinutos));
+  const minutosNum = Number(min);
+  const dentroCarencia = minutosNum <= CARENCIA_MINUTOS;
+  const valorCalculado = calcularValor(minutosNum);
 
   res.json({
     movimentacaoId,
-    permanenciaMinutos: Number(permanenciaMinutos),
+    permanenciaMinutos: minutosNum,
+    minutos: minutosNum,
     dentroCarencia,
     valorCalculado,
+    valor: valorCalculado,
     tabelaAplicada: {
       valorHora: VALOR_HORA,
       carenciaMinutos: CARENCIA_MINUTOS,
@@ -38,23 +42,26 @@ exports.calcular = (req, res) => {
   });
 };
 
-// POST /pagamentos  { movimentacaoId, forma, valorPago, permanenciaMinutos }
+// POST /pagamentos  { movimentacaoId, forma, valorPago / valor, permanenciaMinutos / minutos }
 exports.registrar = (req, res) => {
-  const { movimentacaoId, forma, valorPago, permanenciaMinutos } = req.body;
+  const { movimentacaoId, forma, valorPago, valor, permanenciaMinutos, minutos } = req.body;
 
   if (!movimentacaoId || !forma) {
     return res.status(400).json({ error: 'movimentacaoId e forma sao obrigatorios' });
   }
 
-  const valorDevido = calcularValor(Number(permanenciaMinutos || 0));
-  const troco = parseFloat((Number(valorPago || 0) - valorDevido).toFixed(2));
+  const min = permanenciaMinutos !== undefined ? permanenciaMinutos : (minutos || 0);
+  const valorDevido = calcularValor(Number(min));
+  const vPago = valorPago !== undefined ? Number(valorPago) : (valor !== undefined ? Number(valor) : valorDevido);
+  const troco = parseFloat((vPago - valorDevido).toFixed(2));
 
   const pagamento = {
     id: String(Date.now()),
     movimentacaoId,
     forma,
     valorCalculado: valorDevido,
-    valorPago: Number(valorPago || valorDevido),
+    valor: valorDevido,
+    valorPago: vPago,
     troco: troco > 0 ? troco : 0,
     status: 'CONFIRMADO',
     dataHora: new Date().toISOString(),

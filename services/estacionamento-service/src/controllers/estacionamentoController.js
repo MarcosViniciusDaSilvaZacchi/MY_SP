@@ -1,6 +1,5 @@
 // ──────────────────────────────────────────────────────────────────
-// Estacionamento Controller — dados em memoria (sem banco ainda)
-// Proximo passo: substituir por ORM + PostgreSQL
+// Estacionamento Controller — dados em memoria
 // ──────────────────────────────────────────────────────────────────
 
 const MENSALISTA_URL = process.env.MENSALISTA_SERVICE_URL || 'http://localhost:3003';
@@ -12,18 +11,22 @@ const movimentacoes = [
     placa: 'XYZ9K88',
     tipo: 'MENSALISTA',
     dataHoraEntrada: new Date(Date.now() - 90 * 60000).toISOString(),
+    horaEntrada: new Date(Date.now() - 90 * 60000).toISOString(),
     status: 'ABERTA',
     origem: 'OPERADOR',
     autorizado: true,
+    mensalistaNome: 'Joao Silva',
   },
   {
     id: '1002',
     placa: 'ABC1D23',
     tipo: 'ROTATIVO',
     dataHoraEntrada: new Date(Date.now() - 45 * 60000).toISOString(),
+    horaEntrada: new Date(Date.now() - 45 * 60000).toISOString(),
     status: 'ABERTA',
     origem: 'OPERADOR',
     autorizado: true,
+    mensalistaNome: null,
   },
 ];
 
@@ -59,7 +62,7 @@ exports.registrarEntrada = async (req, res) => {
   );
   if (aberta) return res.status(409).json({ error: 'Veiculo ja possui entrada aberta' });
 
-  // Verifica adimplencia no mensalista-service (comunicacao entre microservicos)
+  // Verifica adimplencia no mensalista-service
   const mensalista = await verificarMensalista(placaUpper);
   const tipo = mensalista ? 'MENSALISTA' : 'ROTATIVO';
   const autorizado =
@@ -72,11 +75,13 @@ exports.registrarEntrada = async (req, res) => {
     });
   }
 
+  const agoraIso = new Date().toISOString();
   const movimentacao = {
     id: String(Date.now()),
     placa: placaUpper,
     tipo,
-    dataHoraEntrada: new Date().toISOString(),
+    dataHoraEntrada: agoraIso,
+    horaEntrada: agoraIso,
     status: 'ABERTA',
     origem,
     autorizado,
@@ -98,29 +103,45 @@ exports.buscarAberta = (req, res) => {
   if (!mov) return res.status(404).json({ error: 'Nenhuma entrada aberta para essa placa' });
 
   const agora = new Date();
-  const entrada = new Date(mov.dataHoraEntrada);
-  const permanenciaMinutos = Math.floor((agora - entrada) / 60000);
+  const entradaIso = mov.dataHoraEntrada || mov.horaEntrada;
+  const entrada = new Date(entradaIso);
+  const permanenciaMinutos = Math.max(1, Math.floor((agora - entrada) / 60000));
 
-  res.json({ ...mov, permanenciaMinutos });
+  res.json({
+    ...mov,
+    dataHoraEntrada: entradaIso,
+    horaEntrada: entradaIso,
+    permanenciaMinutos,
+    minutos: permanenciaMinutos,
+  });
 };
 
-// POST /saidas  { placa }
+// POST /saidas  { placa, movimentacaoId }
 exports.registrarSaida = (req, res) => {
-  const { placa } = req.body;
-  if (!placa) return res.status(400).json({ error: 'Placa obrigatoria' });
+  const { placa, movimentacaoId } = req.body;
+  if (!placa && !movimentacaoId) {
+    return res.status(400).json({ error: 'Placa ou movimentacaoId obrigatorio' });
+  }
 
-  const mov = movimentacoes.find(
-    (m) => m.placa === placa.toUpperCase().trim() && m.status === 'ABERTA'
-  );
-  if (!mov) return res.status(404).json({ error: 'Entrada nao encontrada para essa placa' });
+  const mov = movimentacoes.find((m) => {
+    if (m.status !== 'ABERTA') return false;
+    if (placa && m.placa === placa.toUpperCase().trim()) return true;
+    if (movimentacaoId && m.id === String(movimentacaoId)) return true;
+    return false;
+  });
+
+  if (!mov) return res.status(404).json({ error: 'Entrada aberta nao encontrada para essa placa' });
 
   const dataHoraSaida = new Date().toISOString();
-  const permanenciaMinutos = Math.floor(
-    (new Date(dataHoraSaida) - new Date(mov.dataHoraEntrada)) / 60000
+  const entradaIso = mov.dataHoraEntrada || mov.horaEntrada;
+  const permanenciaMinutos = Math.max(
+    1,
+    Math.floor((new Date(dataHoraSaida) - new Date(entradaIso)) / 60000)
   );
 
   mov.status = 'FINALIZADA';
   mov.dataHoraSaida = dataHoraSaida;
+  mov.horaSaida = dataHoraSaida;
   mov.permanenciaMinutos = permanenciaMinutos;
 
   res.json({ ...mov, mensagem: 'Saida registrada com sucesso' });
@@ -130,7 +151,7 @@ exports.registrarSaida = (req, res) => {
 exports.resumo = (req, res) => {
   const hoje = new Date().toDateString();
   const entradasHoje = movimentacoes.filter(
-    (m) => new Date(m.dataHoraEntrada).toDateString() === hoje
+    (m) => new Date(m.dataHoraEntrada || m.horaEntrada).toDateString() === hoje
   );
   const abertas = movimentacoes.filter((m) => m.status === 'ABERTA');
   const finalizadas = movimentacoes.filter(
@@ -139,8 +160,11 @@ exports.resumo = (req, res) => {
 
   res.json({
     totalEntradasHoje: entradasHoje.length,
+    entradasHoje: entradasHoje.length,
     veiculosNoPatio: abertas.length,
     totalSaidasHoje: finalizadas.length,
-    faturamentoHoje: 0, // calculado pelo pagamento-service
+    saidasHoje: finalizadas.length,
+    faturamentoHoje: 0,
+    faturamentoDia: 0,
   });
 };

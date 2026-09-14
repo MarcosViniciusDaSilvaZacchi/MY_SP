@@ -226,6 +226,12 @@ O front-end em **Vue.js 3** opera como uma aplicação de página única com Vue
 
 ## 6. Modelo C4
 
+> Os arquivos-fonte em PlantUML (.puml) dos 4 níveis do modelo C4 estão disponíveis na pasta [`DIAGRAMA-C4/`](./DIAGRAMA-C4):
+> - **Nível 1 (Contexto):** [`c4-contexto.puml`](./DIAGRAMA-C4/c4-contexto.puml)
+> - **Nível 2 (Contêineres):** [`c4-conteineres.puml`](./DIAGRAMA-C4/c4-conteineres.puml)
+> - **Nível 3 (Componentes):** [`c4-componentes.puml`](./DIAGRAMA-C4/c4-componentes.puml)
+> - **Nível 4 (Código / Classes):** [`c4-codigo.puml`](./DIAGRAMA-C4/c4-codigo.puml) / [`c4-classes.puml`](./DIAGRAMA-C4/c4-classes.puml)
+
 ### Nível 1 — Contexto do Sistema
 
 Visão de alto nível: quem usa o sistema e com quais sistemas externos ele se integra.
@@ -533,6 +539,12 @@ classDiagram
 
 ```
 MY_SP/
+├── DIAGRAMA-C4/                     # Diagramas C4 em PlantUML (.puml)
+│   ├── c4-contexto.puml             # Nível 1 — Contexto do Sistema
+│   ├── c4-conteineres.puml          # Nível 2 — Contêineres
+│   ├── c4-componentes.puml          # Nível 3 — Componentes
+│   ├── c4-codigo.puml               # Nível 4 — Código / Classes
+│   └── c4-classes.puml              # Nível 4 — Classes do Domínio
 ├── frontend/                        # Vue 3 + Vite (SPA)
 │   ├── src/
 │   │   ├── router/index.js          # Rotas + guard JWT
