@@ -1,0 +1,16 @@
+@startuml C4_Context_MyServiceParking
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title Diagrama de Contexto (C4 Nível 1) - MY Service Parking
+
+Person(atendente, "Atendente/Administrador", "Opera o estacionamento: registra entradas, saídas, pagamentos e consulta relatórios.")
+
+System(myServiceParking, "MY Service Parking", "Sistema web de controle de estacionamento para rotativos e mensalistas.")
+
+System_Ext(dispositivos, "Dispositivos físicos (Fase 2)", "Sensores de vaga, cancelas, painéis LED, leitor de placa/ticket.")
+
+Rel(atendente, myServiceParking, "Usa via navegador", "HTTPS")
+Rel(myServiceParking, dispositivos, "Envia comandos / recebe eventos", "Fase 2")
+
+SHOW_LEGEND()
+@enduml

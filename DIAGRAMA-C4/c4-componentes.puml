@@ -1,0 +1,120 @@
+@startuml C4_Component_MyServiceParking
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Diagrama de Componentes (C4 Nível 3) - MY Service Parking
+
+Person(atendente, "Atendente / Administrador", "Opera entradas, saídas, pagamentos, consulta vagas e relatórios.")
+
+Container_Boundary(spa, "Front-end SPA (Vue.js)") {
+    Component(views, "Views / Telas", "Vue 3 SFC", "EntradaView, SaidaView, MensalistasView, VagasView, RelatoriosView, UsuariosView, DashboardView.")
+    Component(router, "Vue Router", "vue-router 4", "Roteamento das páginas e navigation guard com validação de token JWT.")
+    Component(authStore, "Auth Store", "Pinia", "Estado global de autenticação reativo: token, dados do usuário e perfil de acesso.")
+    Component(apiClient, "API Client", "Axios", "Cliente HTTP configurado com interceptors para injeção do Bearer Token e tratamento de erros.")
+}
+
+Container_Boundary(gateway, "API Gateway (Node.js / Express - Porta 3000)") {
+    Component(gwCors, "CORS Middleware", "cors", "Configuração de origens permitidas (localhost:5173).")
+    Component(gwLogger, "Logger Middleware", "morgan", "Registro e rastreamento de requisições HTTP.")
+    Component(gwRouter, "API Router", "Express Router", "Roteamento central das rotas /api/*.")
+    Component(gwAuthMiddleware, "Auth Middleware", "jsonwebtoken", "Valida existência e integridade do token JWT em rotas protegidas.")
+    Component(gwProxyAuth, "Proxy Auth", "http-proxy-middleware", "Encaminha /api/auth para auth-service (porta 3001).")
+    Component(gwProxyEstac, "Proxy Estacionamento", "http-proxy-middleware", "Encaminha /api/entradas, /api/saidas, /api/movimentacoes e /api/relatorios para estacionamento-service (porta 3002).")
+    Component(gwProxyMens, "Proxy Mensalistas", "http-proxy-middleware", "Encaminha /api/mensalistas para mensalista-service (porta 3003).")
+    Component(gwProxyPag, "Proxy Pagamentos", "http-proxy-middleware", "Encaminha /api/pagamentos para pagamento-service (porta 3004).")
+    Component(gwProxyVaga, "Proxy Vagas", "http-proxy-middleware", "Encaminha /api/vagas para vaga-service (porta 3005).")
+}
+
+Container_Boundary(authService, "auth-service (Node.js - Porta 3001)") {
+    Component(authRoutes, "Auth Routes", "Express Router", "Endpoints POST /auth/login e GET /auth/me.")
+    Component(authController, "Auth Controller", "Controller", "Processa autenticação e extração do usuário da sessão.")
+    Component(jwtService, "JWT Utility", "jsonwebtoken", "Gera e verifica tokens JWT com validade configurada (8h).")
+    Component(bcryptService, "Password Hasher", "bcryptjs", "Verificação e hashing de senhas seguras.")
+    Component(userRepo, "User Repository", "In-Memory / ORM", "Acesso aos usuários e perfis (ADMIN / OPERADOR).")
+}
+
+Container_Boundary(estacionamentoService, "estacionamento-service (Node.js - Porta 3002)") {
+    Component(estacRoutes, "Estacionamento Routes", "Express Router", "Endpoints /entradas, /saidas, /movimentacoes/aberta e /relatorios/resumo.")
+    Component(estacController, "Estacionamento Controller", "Controller", "Regras de entrada, saída, cálculo de tempo e totalizações.")
+    Component(mensalistaClient, "Mensalista Client", "Fetch API", "Consulta adimplência de placa via REST no mensalista-service.")
+    Component(estacRepo, "Movimentação Repository", "In-Memory / ORM", "Armazenamento do histórico e status de movimentações.")
+}
+
+Container_Boundary(mensalistaService, "mensalista-service (Node.js - Porta 3003)") {
+    Component(mensRoutes, "Mensalista Routes", "Express Router", "Endpoints CRUD /mensalistas e busca por placa.")
+    Component(mensController, "Mensalista Controller", "Controller", "Gerencia adimplência, prazos de vencimento e regras cadastrais.")
+    Component(mensRepo, "Mensalista Repository", "In-Memory / ORM", "Acesso aos dados de mensalistas, placas e planos.")
+}
+
+Container_Boundary(pagamentoService, "pagamento-service (Node.js - Porta 3004)") {
+    Component(pagRoutes, "Pagamento Routes", "Express Router", "Endpoints /pagamentos/calcular e /pagamentos.")
+    Component(pagController, "Pagamento Controller", "Controller", "Gerencia cálculo de tarifas, confirmação de pagamentos e troco.")
+    Component(tarifaEngine, "Tarifa Engine", "Domain Service", "Aplica tabela de preços (R$ 8/h) e carência de 10 minutos.")
+    Component(pagRepo, "Pagamento Repository", "In-Memory / ORM", "Registro e histórico de transações financeiras.")
+}
+
+Container_Boundary(vagaService, "vaga-service (Node.js - Porta 3005)") {
+    Component(vagaRoutes, "Vaga Routes", "Express Router", "Endpoints /vagas, /vagas/disponibilidade e /vagas/:id/status.")
+    Component(vagaController, "Vaga Controller", "Controller", "Controle de status de vagas (LIVRE, OCUPADA, INDISPONIVEL).")
+    Component(dispEngine, "Disponibilidade Calculator", "Domain Service", "Calcula totais, taxas de ocupação e filtros por tipo/andar.")
+    Component(vagaRepo, "Vaga Repository", "In-Memory / ORM", "Acesso aos dados de vagas do estacionamento.")
+}
+
+ContainerDb(dbAuth, "DB Auth", "SQL Database", "Armazena usuários, credenciais e perfis de acesso.")
+ContainerDb(dbEstacionamento, "DB Estacionamento", "SQL Database", "Armazena registros de movimentações e permanência.")
+ContainerDb(dbMensalista, "DB Mensalistas", "SQL Database", "Armazena cadastros de mensalistas e suas placas.")
+ContainerDb(dbPagamento, "DB Pagamentos", "SQL Database", "Armazena cobranças, recibos e regras de tabela.")
+ContainerDb(dbVaga, "DB Vagas", "SQL Database", "Armazena mapa de vagas, andares e tipos.")
+
+' Relações Front-end
+Rel(atendente, views, "Interage com a interface", "HTTPS")
+Rel(views, router, "Navega entre telas", "JavaScript")
+Rel(views, authStore, "Verifica permissões e perfil", "JavaScript")
+Rel(views, apiClient, "Chama endpoints da API", "JavaScript")
+Rel(apiClient, gwCors, "Envia requisições HTTP/JSON", "REST / Bearer Token")
+
+' Relações API Gateway
+Rel(gwCors, gwLogger, "Repassa fluxo", "Express Pipeline")
+Rel(gwLogger, gwRouter, "Roteia requisições", "Express Pipeline")
+Rel(gwRouter, gwProxyAuth, "Rotas públicas (/api/auth/*)", "HTTP Proxy")
+Rel(gwRouter, gwAuthMiddleware, "Rotas protegidas (JWT guard)", "Express Middleware")
+
+Rel(gwAuthMiddleware, gwProxyEstac, "Token válido -> repassa", "HTTP Proxy")
+Rel(gwAuthMiddleware, gwProxyMens, "Token válido -> repassa", "HTTP Proxy")
+Rel(gwAuthMiddleware, gwProxyPag, "Token válido -> repassa", "HTTP Proxy")
+Rel(gwAuthMiddleware, gwProxyVaga, "Token válido -> repassa", "HTTP Proxy")
+
+' Relações Microserviços -> Controllers
+Rel(gwProxyAuth, authRoutes, "Encaminha requisição", "HTTP / Porta 3001")
+Rel(authRoutes, authController, "Invoca ações", "Express Handler")
+Rel(authController, jwtService, "Assina/valida token", "JavaScript")
+Rel(authController, bcryptService, "Verifica hash de senha", "JavaScript")
+Rel(authController, userRepo, "Consulta usuário", "JavaScript")
+Rel(userRepo, dbAuth, "Lê/grava", "SQL")
+
+Rel(gwProxyEstac, estacRoutes, "Encaminha requisição", "HTTP / Porta 3002")
+Rel(estacRoutes, estacController, "Invoca ações", "Express Handler")
+Rel(estacController, mensalistaClient, "Verifica placa", "HTTP GET /mensalistas/placa/:placa")
+Rel(mensalistaClient, mensRoutes, "Consulta adimplência", "HTTP / Porta 3003")
+Rel(estacController, estacRepo, "Persiste movimentação", "JavaScript")
+Rel(estacRepo, dbEstacionamento, "Lê/grava", "SQL")
+
+Rel(gwProxyMens, mensRoutes, "Encaminha requisição", "HTTP / Porta 3003")
+Rel(mensRoutes, mensController, "Invoca ações", "Express Handler")
+Rel(mensController, mensRepo, "Consulta/atualiza mensalista", "JavaScript")
+Rel(mensRepo, dbMensalista, "Lê/grava", "SQL")
+
+Rel(gwProxyPag, pagRoutes, "Encaminha requisição", "HTTP / Porta 3004")
+Rel(pagRoutes, pagController, "Invoca ações", "Express Handler")
+Rel(pagController, tarifaEngine, "Aplica regras e carência", "JavaScript")
+Rel(pagController, pagRepo, "Persiste pagamento", "JavaScript")
+Rel(pagRepo, dbPagamento, "Lê/grava", "SQL")
+
+Rel(gwProxyVaga, vagaRoutes, "Encaminha requisição", "HTTP / Porta 3005")
+Rel(vagaRoutes, vagaController, "Invoca ações", "Express Handler")
+Rel(vagaController, dispEngine, "Calcula métricas de vagas", "JavaScript")
+Rel(vagaController, vagaRepo, "Consulta/atualiza status de vaga", "JavaScript")
+Rel(vagaRepo, dbVaga, "Lê/grava", "SQL")
+
+SHOW_LEGEND()
+@enduml
+

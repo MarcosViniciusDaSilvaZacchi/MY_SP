@@ -1,0 +1,13 @@
+{
+  "name": "my-service-parking",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sistema Web de Controle de Estacionamento em Microserviços — MY Service Parking",
+  "scripts": {
+    "start": "node iniciar.js",
+    "dev": "node iniciar.js",
+    "install:all": "node iniciar.js --install-only",
+    "stop": "powershell -ExecutionPolicy Bypass -File parar.ps1"
+  }
+}
+

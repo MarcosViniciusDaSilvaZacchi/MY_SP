@@ -1,0 +1,396 @@
+@startuml C4_Code_MyServiceParking
+title Diagrama de Código / Classes S.O.L.I.D. (C4 Nível 4) - MY Service Parking
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam roundcorner 8
+hide circle
+skinparam class {
+    BackgroundColor White
+    BorderColor #2C3E50
+    ArrowColor #2C3E50
+}
+
+package "gateway" <<Rectangle>> {
+    class AuthMiddleware {
+        +authMiddleware(req: Request, res: Response, next: NextFunction): void
+    }
+}
+
+package "auth-service" <<Rectangle>> {
+    class AuthController {
+        -authService: AuthService
+        +login(req: Request, res: Response): Promise<Response>
+        +me(req: Request, res: Response): Promise<Response>
+        +listarUsuarios(req: Request, res: Response): Promise<Response>
+        +criarUsuario(req: Request, res: Response): Promise<Response>
+        +removerUsuario(req: Request, res: Response): Promise<Response>
+    }
+
+    class AuthService {
+        -usuarioRepository: IUsuarioRepository
+        -jwtService: IJwtService
+        -passwordHasher: IPasswordHasher
+        +login(email: String, senha: String): Promise<Object>
+        +obterUsuarioPorToken(token: String): Promise<Object>
+        +listarUsuarios(): Promise<Usuario[]>
+        +criarUsuario(dados: Object): Promise<Usuario>
+        +removerUsuario(id: int): Promise<Object>
+    }
+
+    interface IUsuarioRepository <<interface>> {
+        +buscarPorEmail(email: String): Promise<Usuario>
+        +buscarPorId(id: int): Promise<Usuario>
+        +listar(): Promise<Usuario[]>
+        +salvar(usuario: Usuario): Promise<Usuario>
+        +remover(id: int): Promise<Boolean>
+    }
+
+    class InMemoryUsuarioRepository {
+        -usuarios: Usuario[]
+        +buscarPorEmail(email: String): Promise<Usuario>
+        +buscarPorId(id: int): Promise<Usuario>
+        +listar(): Promise<Usuario[]>
+        +salvar(usuario: Usuario): Promise<Usuario>
+        +remover(id: int): Promise<Boolean>
+    }
+
+    interface IJwtService <<interface>> {
+        +gerarToken(payload: Object, expiresIn: String): String
+        +verificarToken(token: String): Object
+    }
+
+    class JwtService {
+        -secret: String
+        -defaultExpiresIn: String
+        +gerarToken(payload: Object, expiresIn: String): String
+        +verificarToken(token: String): Object
+    }
+
+    interface IPasswordHasher <<interface>> {
+        +hash(senha: String): String
+        +compare(senha: String, hash: String): Boolean
+    }
+
+    class BcryptPasswordHasher {
+        -saltRounds: int
+        +hash(senha: String): String
+        +compare(senha: String, hash: String): Boolean
+    }
+
+    class Usuario {
+        +id: int
+        +nome: String
+        +email: String
+        +senhaHash: String
+        +perfil: Perfil
+        +validar(): void
+        +toJSON(): Object
+    }
+
+    enum Perfil <<enumeration>> {
+        ADMIN
+        OPERADOR
+    }
+
+    Usuario --> Perfil
+    AuthController --> AuthService
+    AuthService --> IUsuarioRepository
+    AuthService --> IJwtService
+    AuthService --> IPasswordHasher
+    InMemoryUsuarioRepository ..|> IUsuarioRepository
+    InMemoryUsuarioRepository --> Usuario
+    JwtService ..|> IJwtService
+    BcryptPasswordHasher ..|> IPasswordHasher
+}
+
+package "estacionamento-service" <<Rectangle>> {
+    class EstacionamentoController {
+        -estacionamentoService: EstacionamentoService
+        +listarEntradas(req: Request, res: Response): Promise<Response>
+        +registrarEntrada(req: Request, res: Response): Promise<Response>
+        +buscarAberta(req: Request, res: Response): Promise<Response>
+        +registrarSaida(req: Request, res: Response): Promise<Response>
+        +resumo(req: Request, res: Response): Promise<Response>
+    }
+
+    class EstacionamentoService {
+        -movimentacaoRepository: IMovimentacaoRepository
+        -mensalistaClient: IMensalistaClient
+        -pagamentoClient: IPagamentoClient
+        +listarEntradas(): Promise<Movimentacao[]>
+        +registrarEntrada(dados: Object): Promise<Object>
+        +buscarAberta(placa: String): Promise<Object>
+        +registrarSaida(dados: Object): Promise<Object>
+        +obterResumo(): Promise<Object>
+    }
+
+    interface IMovimentacaoRepository <<interface>> {
+        +listar(): Promise<Movimentacao[]>
+        +buscarAbertaPorPlaca(placa: String): Promise<Movimentacao>
+        +buscarAbertaPorId(id: String): Promise<Movimentacao>
+        +salvar(movimentacao: Movimentacao): Promise<Movimentacao>
+        +atualizar(movimentacao: Movimentacao): Promise<Movimentacao>
+    }
+
+    class InMemoryMovimentacaoRepository {
+        -movimentacoes: Movimentacao[]
+    }
+
+    interface IMensalistaClient <<interface>> {
+        +verificarMensalistaPorPlaca(placa: String): Promise<Object>
+    }
+
+    class MensalistaHttpClient {
+        -baseUrl: String
+        -timeoutMs: int
+        +verificarMensalistaPorPlaca(placa: String): Promise<Object>
+    }
+
+    interface IPagamentoClient <<interface>> {
+        +listarPagamentos(): Promise<Object[]>
+    }
+
+    class PagamentoHttpClient {
+        -baseUrl: String
+        -timeoutMs: int
+        +listarPagamentos(): Promise<Object[]>
+    }
+
+    class Movimentacao {
+        +id: String
+        +placa: String
+        +tipo: TipoMovimentacao
+        +dataHoraEntrada: DateTime
+        +dataHoraSaida: DateTime
+        +status: StatusMovimentacao
+        +valorCobrado: float
+        +validar(): void
+        +calcularPermanenciaMinutos(ref: DateTime): int
+        +finalizar(dataSaida: DateTime, valorCobrado: float): void
+        +toJSON(): Object
+    }
+
+    enum TipoMovimentacao <<enumeration>> {
+        ROTATIVO
+        MENSALISTA
+    }
+
+    enum StatusMovimentacao <<enumeration>> {
+        ABERTA
+        AGUARDANDO_PAGAMENTO
+        FINALIZADA
+        CANCELADA
+    }
+
+    Movimentacao --> TipoMovimentacao
+    Movimentacao --> StatusMovimentacao
+    EstacionamentoController --> EstacionamentoService
+    EstacionamentoService --> IMovimentacaoRepository
+    EstacionamentoService --> IMensalistaClient
+    EstacionamentoService --> IPagamentoClient
+    InMemoryMovimentacaoRepository ..|> IMovimentacaoRepository
+    InMemoryMovimentacaoRepository --> Movimentacao
+    MensalistaHttpClient ..|> IMensalistaClient
+    PagamentoHttpClient ..|> IPagamentoClient
+}
+
+package "mensalista-service" <<Rectangle>> {
+    class MensalistaController {
+        -mensalistaService: MensalistaService
+        +listar(req: Request, res: Response): Promise<Response>
+        +buscarPorPlaca(req: Request, res: Response): Promise<Response>
+        +cadastrar(req: Request, res: Response): Promise<Response>
+        +atualizar(req: Request, res: Response): Promise<Response>
+    }
+
+    class MensalistaService {
+        -mensalistaRepository: IMensalistaRepository
+        +listar(filtroPlaca: String): Promise<Object[]>
+        +buscarPorPlaca(placa: String): Promise<Object>
+        +cadastrar(dados: Object): Promise<Object>
+        +atualizar(id: String, dados: Object): Promise<Object>
+    }
+
+    interface IMensalistaRepository <<interface>> {
+        +listar(filtroPlaca: String): Promise<Mensalista[]>
+        +buscarPorId(id: String): Promise<Mensalista>
+        +buscarPorPlaca(placa: String): Promise<Mensalista>
+        +salvar(mensalista: Mensalista): Promise<Mensalista>
+        +atualizar(id: String, dados: Object): Promise<Mensalista>
+    }
+
+    class InMemoryMensalistaRepository {
+        -mensalistas: Mensalista[]
+    }
+
+    class Mensalista {
+        +id: String
+        +nome: String
+        +cpf: String
+        +email: String
+        +placa: String
+        +vencimento: String
+        +status: StatusMensalista
+        +planoMensal: float
+        +validar(): void
+        +estaAdimplente(): Boolean
+        +atualizar(dados: Object): void
+        +toJSON(): Object
+    }
+
+    enum StatusMensalista <<enumeration>> {
+        EM_DIA
+        INADIMPLENTE
+        BLOQUEADO
+        INATIVO
+    }
+
+    Mensalista --> StatusMensalista
+    MensalistaController --> MensalistaService
+    MensalistaService --> IMensalistaRepository
+    InMemoryMensalistaRepository ..|> IMensalistaRepository
+    InMemoryMensalistaRepository --> Mensalista
+}
+
+package "pagamento-service" <<Rectangle>> {
+    class PagamentoController {
+        -pagamentoService: PagamentoService
+        +calcular(req: Request, res: Response): Promise<Response>
+        +registrar(req: Request, res: Response): Promise<Response>
+        +listar(req: Request, res: Response): Promise<Response>
+    }
+
+    class PagamentoService {
+        -pagamentoRepository: IPagamentoRepository
+        -tarifaEngine: TarifaEngine
+        +calcularTarifa(dados: Object): Promise<Object>
+        +registrarPagamento(dados: Object): Promise<Object>
+        +listarPagamentos(): Promise<Object[]>
+    }
+
+    interface IPagamentoRepository <<interface>> {
+        +salvar(pagamento: Pagamento): Promise<Pagamento>
+        +listar(): Promise<Pagamento[]>
+        +buscarPorId(id: String): Promise<Pagamento>
+        +buscarPorMovimentacaoId(movimentacaoId: String): Promise<Pagamento>
+    }
+
+    class InMemoryPagamentoRepository {
+        -pagamentos: Pagamento[]
+    }
+
+    interface ITarifaStrategy <<interface>> {
+        +calcular(permanenciaMinutos: int): Object
+    }
+
+    class TarifaPadraoStrategy {
+        -tabela: TabelaPreco
+        +calcular(permanenciaMinutos: int): Object
+    }
+
+    class TarifaDiferenciadaStrategy {
+        +calcular(permanenciaMinutos: int): Object
+    }
+
+    class TarifaEngine {
+        -strategy: ITarifaStrategy
+        +setStrategy(strategy: ITarifaStrategy): void
+        +calcular(permanenciaMinutos: int): Object
+    }
+
+    interface IPagamentoProcessor <<interface>> {
+        +processar(valorDevido: float, valorPago: float): Object
+    }
+
+    class PagamentoProcessorFactory {
+        +{static} obterProcessador(forma: String): IPagamentoProcessor
+    }
+
+    class Pagamento {
+        +id: String
+        +movimentacaoId: String
+        +forma: FormaPagamento
+        +valorCalculado: float
+        +valorPago: float
+        +troco: float
+        +status: StatusPagamento
+        +dataHora: DateTime
+        +validar(): void
+        +confirmar(): void
+        +toJSON(): Object
+    }
+
+    class TabelaPreco {
+        +id: String
+        +descricao: String
+        +valorPorHora: float
+        +carenciaMinutos: int
+    }
+
+    PagamentoController --> PagamentoService
+    PagamentoService --> IPagamentoRepository
+    PagamentoService --> TarifaEngine
+    PagamentoService ..> PagamentoProcessorFactory
+    TarifaEngine --> ITarifaStrategy
+    TarifaPadraoStrategy ..|> ITarifaStrategy
+    TarifaPadraoStrategy --> TabelaPreco
+    TarifaDiferenciadaStrategy ..|> ITarifaStrategy
+    InMemoryPagamentoRepository ..|> IPagamentoRepository
+    InMemoryPagamentoRepository --> Pagamento
+}
+
+package "vaga-service" <<Rectangle>> {
+    class VagaController {
+        -vagaService: VagaService
+        +listar(req: Request, res: Response): Promise<Response>
+        +disponibilidade(req: Request, res: Response): Promise<Response>
+        +atualizarStatus(req: Request, res: Response): Promise<Response>
+    }
+
+    class VagaService {
+        -vagaRepository: IVagaRepository
+        -disponibilidadeCalculator: DisponibilidadeCalculator
+        +listarVagas(filtros: Object): Promise<Object[]>
+        +obterDisponibilidade(): Promise<Object>
+        +atualizarStatus(id: String, novoStatus: String): Promise<Object>
+    }
+
+    interface IVagaRepository <<interface>> {
+        +listar(filtros: Object): Promise<Vaga[]>
+        +buscarPorId(id: String): Promise<Vaga>
+        +atualizarStatus(id: String, status: String): Promise<Vaga>
+    }
+
+    class InMemoryVagaRepository {
+        -vagas: Vaga[]
+    }
+
+    class DisponibilidadeCalculator {
+        +calcularMetricas(vagas: Vaga[]): Object
+    }
+
+    class Vaga {
+        +id: String
+        +codigo: String
+        +andar: int
+        +tipo: TipoVaga
+        +status: StatusVaga
+        +ocupar(): void
+        +liberar(): void
+        +bloquear(): void
+        +atualizarStatus(novoStatus: String): void
+    }
+
+    VagaController --> VagaService
+    VagaService --> IVagaRepository
+    VagaService --> DisponibilidadeCalculator
+    InMemoryVagaRepository ..|> IVagaRepository
+    InMemoryVagaRepository --> Vaga
+}
+
+MensalistaHttpClient ..> MensalistaController : HTTP GET /mensalistas/placa/:placa
+PagamentoHttpClient ..> PagamentoController : HTTP GET /pagamentos
+
+@enduml

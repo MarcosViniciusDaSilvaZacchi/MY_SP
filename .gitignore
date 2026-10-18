@@ -1,0 +1,29 @@
+# Dependências
+node_modules/
+package-lock.json
+
+# Builds
+dist/
+build/
+
+# Variáveis de ambiente
+.env
+.env.*
+!.env.example
+
+# Bancos de dados locais SQLite
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Sistema Operacional
+.DS_Store
+Thumbs.db
+desktop.ini

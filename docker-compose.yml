@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+
+  # ── Frontend Vue.js ────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:3000/api
+    container_name: my-parking-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - gateway
+    networks:
+      - parking-net
+    restart: unless-stopped
+
+  # ── API Gateway ────────────────────────────────────────────────────
+  gateway:
+    build: ./gateway
+    container_name: my-parking-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      JWT_SECRET: ${JWT_SECRET:-my-parking-secret}
+      FRONTEND_URL: http://localhost
+      AUTH_SERVICE_URL: http://auth-service:3001
+      ESTACIONAMENTO_SERVICE_URL: http://estacionamento-service:3002
+      MENSALISTA_SERVICE_URL: http://mensalista-service:3003
+      PAGAMENTO_SERVICE_URL: http://pagamento-service:3004
+      VAGA_SERVICE_URL: http://vaga-service:3005
+    depends_on:
+      - auth-service
+      - estacionamento-service
+      - mensalista-service
+      - pagamento-service
+      - vaga-service
+    networks:
+      - parking-net
+    restart: unless-stopped
+
+  # ── Auth Service ───────────────────────────────────────────────────
+  auth-service:
+    build: ./services/auth-service
+    container_name: my-parking-auth
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      JWT_SECRET: ${JWT_SECRET:-my-parking-secret}
+      JWT_EXPIRES_IN: 8h
+    networks:
+      - parking-net
+    restart: unless-stopped
+
+  # ── Estacionamento Service ─────────────────────────────────────────
+  estacionamento-service:
+    build: ./services/estacionamento-service
+    container_name: my-parking-estacionamento
+    ports:
+      - "3002:3002"
+    environment:
+      PORT: 3002
+    networks:
+      - parking-net
+    restart: unless-stopped
+
+  # ── Mensalista Service ─────────────────────────────────────────────
+  mensalista-service:
+    build: ./services/mensalista-service
+    container_name: my-parking-mensalista
+    ports:
+      - "3003:3003"
+    environment:
+      PORT: 3003
+    networks:
+      - parking-net
+    restart: unless-stopped
+
+  # ── Pagamento Service ──────────────────────────────────────────────
+  pagamento-service:
+    build: ./services/pagamento-service
+    container_name: my-parking-pagamento
+    ports:
+      - "3004:3004"
+    environment:
+      PORT: 3004
+    networks:
+      - parking-net
+    restart: unless-stopped
+
+  # ── Vaga Service ───────────────────────────────────────────────────
+  vaga-service:
+    build: ./services/vaga-service
+    container_name: my-parking-vaga
+    ports:
+      - "3005:3005"
+    environment:
+      PORT: 3005
+    networks:
+      - parking-net
+    restart: unless-stopped
+
+networks:
+  parking-net:
+    driver: bridge
