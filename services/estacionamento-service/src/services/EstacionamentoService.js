@@ -5,17 +5,29 @@
 
 const { Movimentacao } = require('../domain/entities/Movimentacao');
 const { TipoMovimentacao, StatusMovimentacao } = require('../domain/enums/EstacionamentoEnums');
+const { ResumoEstacionamentoCalculator } = require('../domain/services/ResumoEstacionamentoCalculator');
+const { AvaliadorAcessoContext } = require('../domain/strategies/RegrasAcesso');
 
 class EstacionamentoService {
   /**
    * @param {import('../repositories/IMovimentacaoRepository').IMovimentacaoRepository} movimentacaoRepository
    * @param {import('../clients/MensalistaClient').IMensalistaClient} mensalistaClient
    * @param {import('../clients/PagamentoClient').IPagamentoClient} [pagamentoClient]
+   * @param {ResumoEstacionamentoCalculator} [resumoCalculator]
+   * @param {AvaliadorAcessoContext} [avaliadorAcesso]
    */
-  constructor(movimentacaoRepository, mensalistaClient, pagamentoClient = null) {
+  constructor(
+    movimentacaoRepository,
+    mensalistaClient,
+    pagamentoClient = null,
+    resumoCalculator = new ResumoEstacionamentoCalculator(),
+    avaliadorAcesso = new AvaliadorAcessoContext()
+  ) {
     this.movimentacaoRepository = movimentacaoRepository;
     this.mensalistaClient = mensalistaClient;
     this.pagamentoClient = pagamentoClient;
+    this.resumoCalculator = resumoCalculator;
+    this.avaliadorAcesso = avaliadorAcesso;
   }
 
   async listarEntradas() {
@@ -39,15 +51,20 @@ class EstacionamentoService {
       throw err;
     }
 
-    // Consulta mensalista via adapter/client desacoplado
+    // Consulta mensalista via adapter/client desacoplado (DIP & ISP)
     const mensalista = await this.mensalistaClient.verificarMensalistaPorPlaca(placaUpper);
-    const tipo = mensalista ? TipoMovimentacao.MENSALISTA : TipoMovimentacao.ROTATIVO;
-    const autorizado = tipo === TipoMovimentacao.ROTATIVO || mensalista?.status === 'EM_DIA';
 
-    if (!autorizado) {
-      const err = new Error('Acesso negado: mensalista inadimplente ou bloqueado');
+    // Avaliação de permissão de acesso delegada ao Strategy Pattern (OCP & SRP)
+    const avaliacao = this.avaliadorAcesso.avaliar({
+      placa: placaUpper,
+      mensalista,
+      origem,
+    });
+
+    if (!avaliacao.autorizado) {
+      const err = new Error(`Acesso negado: ${avaliacao.motivoNegacao || 'veículo não autorizado'}`);
       err.statusCode = 403;
-      err.detalhes = { status: mensalista?.status };
+      err.detalhes = { status: mensalista?.status, motivo: avaliacao.motivoNegacao };
       throw err;
     }
 
@@ -55,13 +72,13 @@ class EstacionamentoService {
     const movimentacao = new Movimentacao({
       id: String(Date.now()),
       placa: placaUpper,
-      tipo,
+      tipo: avaliacao.tipo,
       dataHoraEntrada: agoraIso,
       horaEntrada: agoraIso,
       status: StatusMovimentacao.ABERTA,
       origem,
-      autorizado,
-      mensalistaNome: mensalista?.nome || null,
+      autorizado: true,
+      mensalistaNome: avaliacao.mensalistaNome || null,
     });
 
     movimentacao.validar();
@@ -145,48 +162,15 @@ class EstacionamentoService {
   }
 
   async obterResumo() {
-    const hoje = new Date().toDateString();
     const lista = await this.movimentacaoRepository.listar();
-
-    const entradasHoje = lista.filter(
-      (m) => new Date(m.dataHoraEntrada || m.horaEntrada).toDateString() === hoje
-    );
-    const abertas = lista.filter((m) => m.status === StatusMovimentacao.ABERTA);
-    const finalizadas = lista.filter(
-      (m) => m.status === StatusMovimentacao.FINALIZADA && new Date(m.dataHoraSaida || 0).toDateString() === hoje
-    );
-
-    let faturamentoHoje = finalizadas.reduce((acc, m) => acc + (Number(m.valorCobrado) || 0), 0);
+    let pagamentos = [];
 
     if (this.pagamentoClient) {
-      const pagamentos = await this.pagamentoClient.listarPagamentos();
-      const pagamentosHoje = pagamentos.filter(
-        (p) => p.status === 'CONFIRMADO' && (!p.dataHora || new Date(p.dataHora).toDateString() === hoje)
-      );
-      if (pagamentosHoje.length > 0) {
-        const somaPagamentos = pagamentosHoje.reduce(
-          (acc, p) => acc + (Number(p.valorCalculado ?? p.valor ?? 0) || 0),
-          0
-        );
-        faturamentoHoje = Math.max(faturamentoHoje, somaPagamentos);
-      }
+      pagamentos = await this.pagamentoClient.listarPagamentos();
     }
 
-    faturamentoHoje = parseFloat(faturamentoHoje.toFixed(2));
-
-    return {
-      totalEntradas: entradasHoje.length,
-      totalEntradasHoje: entradasHoje.length,
-      entradasHoje: entradasHoje.length,
-      veiculosNoPatio: abertas.length,
-      totalSaidas: finalizadas.length,
-      totalSaidasHoje: finalizadas.length,
-      saidasHoje: finalizadas.length,
-      faturamento: faturamentoHoje,
-      faturamentoHoje,
-      faturamentoDia: faturamentoHoje,
-      ocupacaoMedia: Number((abertas.length / 20).toFixed(2)),
-    };
+    // Delegação do cálculo de métricas para o domínio especialista (SRP & DIP)
+    return this.resumoCalculator.calcular(lista, pagamentos, new Date());
   }
 }
 

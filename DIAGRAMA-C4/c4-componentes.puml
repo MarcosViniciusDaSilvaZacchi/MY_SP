@@ -35,20 +35,25 @@ Container_Boundary(authService, "auth-service (Node.js - Porta 3001)") {
 Container_Boundary(estacionamentoService, "estacionamento-service (Node.js - Porta 3002)") {
     Component(estacRoutes, "Estacionamento Routes", "Express Router", "Endpoints /entradas, /saidas, /movimentacoes/aberta e /relatorios/resumo.")
     Component(estacController, "Estacionamento Controller", "Controller", "Regras de entrada, saída, cálculo de tempo e totalizações.")
+    Component(regrasAcesso, "Avaliador de Acesso (Strategy)", "Domain Service", "Valida regras de acesso (Rotativo, Mensalista em dia, Bloqueios).")
+    Component(resumoCalc, "Resumo Calculator", "Domain Service", "Consolidação estatística de permanência, faturamento e ocupação.")
     Component(mensalistaClient, "Mensalista Client", "Fetch API", "Consulta adimplência de placa via REST no mensalista-service.")
+    Component(pagamentoClient, "Pagamento Client", "Fetch API", "Verifica liquidação de pagamento confirmado no pagamento-service.")
     Component(estacRepo, "Movimentação Repository", "In-Memory / ORM", "Armazenamento do histórico e status de movimentações.")
 }
 
 Container_Boundary(mensalistaService, "mensalista-service (Node.js - Porta 3003)") {
     Component(mensRoutes, "Mensalista Routes", "Express Router", "Endpoints CRUD /mensalistas e busca por placa.")
     Component(mensController, "Mensalista Controller", "Controller", "Gerencia adimplência, prazos de vencimento e regras cadastrais.")
+    Component(validadorCpf, "Validador de CPF", "Domain Service", "Validação algorítmica de dígitos verificadores de CPF.")
     Component(mensRepo, "Mensalista Repository", "In-Memory / ORM", "Acesso aos dados de mensalistas, placas e planos.")
 }
 
 Container_Boundary(pagamentoService, "pagamento-service (Node.js - Porta 3004)") {
     Component(pagRoutes, "Pagamento Routes", "Express Router", "Endpoints /pagamentos/calcular e /pagamentos.")
     Component(pagController, "Pagamento Controller", "Controller", "Gerencia cálculo de tarifas, confirmação de pagamentos e troco.")
-    Component(tarifaEngine, "Tarifa Engine", "Domain Service", "Aplica tabela de preços (R$ 8/h) e carência de 10 minutos.")
+    Component(tarifaEngine, "Tarifa Engine (Strategy)", "Domain Service", "Aplica tabela de preços (R$ 8/h, Escalonada ou Noturna) e carência.")
+    Component(pagamentoProcessors, "Payment Processors (Strategy)", "Domain Service", "Processa meios de pagamento PIX (EMVCo), Cartão (Luhn/TEF) e Dinheiro.")
     Component(pagRepo, "Pagamento Repository", "In-Memory / ORM", "Registro e histórico de transações financeiras.")
 }
 
@@ -56,6 +61,7 @@ Container_Boundary(vagaService, "vaga-service (Node.js - Porta 3005)") {
     Component(vagaRoutes, "Vaga Routes", "Express Router", "Endpoints /vagas, /vagas/disponibilidade e /vagas/:id/status.")
     Component(vagaController, "Vaga Controller", "Controller", "Controle de status de vagas (LIVRE, OCUPADA, INDISPONIVEL).")
     Component(dispEngine, "Disponibilidade Calculator", "Domain Service", "Calcula totais, taxas de ocupação e filtros por tipo/andar.")
+    Component(alocadorVagas, "Alocador de Vagas (Strategy)", "Domain Service", "Avalia compatibilidade entre porte do veículo e tipo de vaga.")
     Component(vagaRepo, "Vaga Repository", "In-Memory / ORM", "Acesso aos dados de vagas do estacionamento.")
 }
 
@@ -93,28 +99,33 @@ Rel(userRepo, dbAuth, "Lê/grava", "SQL")
 
 Rel(gwProxyEstac, estacRoutes, "Encaminha requisição", "HTTP / Porta 3002")
 Rel(estacRoutes, estacController, "Invoca ações", "Express Handler")
+Rel(estacController, regrasAcesso, "Avalia permissão de entrada", "JavaScript")
+Rel(estacController, resumoCalc, "Consolida faturamento e ocupação", "JavaScript")
 Rel(estacController, mensalistaClient, "Verifica placa", "HTTP GET /mensalistas/placa/:placa")
+Rel(estacController, pagamentoClient, "Verifica pagamento", "HTTP GET /pagamentos/movimentacao/:id")
 Rel(mensalistaClient, mensRoutes, "Consulta adimplência", "HTTP / Porta 3003")
 Rel(estacController, estacRepo, "Persiste movimentação", "JavaScript")
 Rel(estacRepo, dbEstacionamento, "Lê/grava", "SQL")
 
 Rel(gwProxyMens, mensRoutes, "Encaminha requisição", "HTTP / Porta 3003")
 Rel(mensRoutes, mensController, "Invoca ações", "Express Handler")
+Rel(mensController, validadorCpf, "Valida integridade do CPF", "JavaScript")
 Rel(mensController, mensRepo, "Consulta/atualiza mensalista", "JavaScript")
 Rel(mensRepo, dbMensalista, "Lê/grava", "SQL")
 
 Rel(gwProxyPag, pagRoutes, "Encaminha requisição", "HTTP / Porta 3004")
 Rel(pagRoutes, pagController, "Invoca ações", "Express Handler")
 Rel(pagController, tarifaEngine, "Aplica regras e carência", "JavaScript")
+Rel(pagController, pagamentoProcessors, "Processa PIX/Cartão/Dinheiro", "JavaScript")
 Rel(pagController, pagRepo, "Persiste pagamento", "JavaScript")
 Rel(pagRepo, dbPagamento, "Lê/grava", "SQL")
 
 Rel(gwProxyVaga, vagaRoutes, "Encaminha requisição", "HTTP / Porta 3005")
 Rel(vagaRoutes, vagaController, "Invoca ações", "Express Handler")
 Rel(vagaController, dispEngine, "Calcula métricas de vagas", "JavaScript")
+Rel(vagaController, alocadorVagas, "Filtra compatibilidade", "JavaScript")
 Rel(vagaController, vagaRepo, "Consulta/atualiza status de vaga", "JavaScript")
 Rel(vagaRepo, dbVaga, "Lê/grava", "SQL")
 
 SHOW_LEGEND()
 @enduml
-

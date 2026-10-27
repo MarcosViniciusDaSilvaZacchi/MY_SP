@@ -5,13 +5,16 @@
 
 const { Mensalista } = require('../domain/entities/Mensalista');
 const { StatusMensalista } = require('../domain/enums/StatusMensalista');
+const { ValidadorCpf } = require('../domain/services/ValidadorCpf');
 
 class MensalistaService {
   /**
    * @param {import('../repositories/IMensalistaRepository').IMensalistaRepository} mensalistaRepository
+   * @param {ValidadorCpf} [validadorCpf]
    */
-  constructor(mensalistaRepository) {
+  constructor(mensalistaRepository, validadorCpf = new ValidadorCpf()) {
     this.mensalistaRepository = mensalistaRepository;
+    this.validadorCpf = validadorCpf;
   }
 
   async listar(filtroPlaca) {
@@ -39,6 +42,14 @@ class MensalistaService {
   async cadastrar({ nome, cpf, email, placa, vencimento, planoMensal }) {
     if (!nome || !cpf || !placa || !vencimento) {
       const err = new Error('nome, cpf, placa e vencimento sao obrigatorios');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Validação de integridade do CPF delegada ao serviço especializado (SRP & DIP)
+    const cpfLimpo = String(cpf).replace(/\D/g, '');
+    if (cpfLimpo.length === 11 && !this.validadorCpf.validar(cpfLimpo)) {
+      const err = new Error('CPF fornecido é inválido');
       err.statusCode = 400;
       throw err;
     }

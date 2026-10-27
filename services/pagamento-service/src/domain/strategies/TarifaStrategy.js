@@ -95,6 +95,43 @@ class TarifaDiferenciadaStrategy extends ITarifaStrategy {
 }
 
 /**
+ * Tarifa Noturna / Pernoite (Extensão OCP):
+ * Valor fixo fechado de R$ 35,00 para permanências longas (> 6 horas)
+ */
+class TarifaNoturnaStrategy extends ITarifaStrategy {
+  constructor(valorFixoPernoite = 35.0, carenciaMinutos = 10) {
+    super();
+    this.valorFixoPernoite = valorFixoPernoite;
+    this.carenciaMinutos = carenciaMinutos;
+  }
+
+  calcular(permanenciaMinutos) {
+    const min = Number(permanenciaMinutos) || 0;
+    if (min <= this.carenciaMinutos) {
+      return {
+        valorCalculado: 0.0,
+        dentroCarencia: true,
+        tabelaAplicada: {
+          descricao: 'Tarifa Pernoite Noturna',
+          valorFixo: this.valorFixoPernoite,
+          carenciaMinutos: this.carenciaMinutos,
+        },
+      };
+    }
+
+    return {
+      valorCalculado: parseFloat(this.valorFixoPernoite.toFixed(2)),
+      dentroCarencia: false,
+      tabelaAplicada: {
+        descricao: 'Tarifa Pernoite Noturna',
+        valorFixo: this.valorFixoPernoite,
+        carenciaMinutos: this.carenciaMinutos,
+      },
+    };
+  }
+}
+
+/**
  * TarifaEngine (Contexto do Strategy Pattern)
  */
 class TarifaEngine {
@@ -118,5 +155,6 @@ module.exports = {
   ITarifaStrategy,
   TarifaPadraoStrategy,
   TarifaDiferenciadaStrategy,
+  TarifaNoturnaStrategy,
   TarifaEngine,
 };

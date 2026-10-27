@@ -1,5 +1,6 @@
 const express = require('express');
 const { InMemoryMensalistaRepository } = require('../repositories/InMemoryMensalistaRepository');
+const { ValidadorCpf } = require('../domain/services/ValidadorCpf');
 const { MensalistaService } = require('../services/MensalistaService');
 const { MensalistaController } = require('../controllers/mensalistaController');
 
@@ -7,7 +8,8 @@ const router = express.Router();
 
 // Composition Root / Injeção de Dependências (DIP)
 const mensalistaRepository = new InMemoryMensalistaRepository();
-const mensalistaService = new MensalistaService(mensalistaRepository);
+const validadorCpf = new ValidadorCpf();
+const mensalistaService = new MensalistaService(mensalistaRepository, validadorCpf);
 const mensalistaController = new MensalistaController(mensalistaService);
 
 router.get('/mensalistas',              mensalistaController.listar);

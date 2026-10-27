@@ -119,11 +119,35 @@ package "estacionamento-service" <<Rectangle>> {
         -movimentacaoRepository: IMovimentacaoRepository
         -mensalistaClient: IMensalistaClient
         -pagamentoClient: IPagamentoClient
+        -resumoCalculator: ResumoEstacionamentoCalculator
+        -avaliadorAcesso: AvaliadorAcessoContext
         +listarEntradas(): Promise<Movimentacao[]>
         +registrarEntrada(dados: Object): Promise<Object>
         +buscarAberta(placa: String): Promise<Object>
         +registrarSaida(dados: Object): Promise<Object>
         +obterResumo(): Promise<Object>
+    }
+
+    class ResumoEstacionamentoCalculator {
+        -capacidadeTotal: int
+        +calcular(movs: Movimentacao[], pags: Object[], dataRef: Date): Object
+    }
+
+    interface IRegraAcessoStrategy <<interface>> {
+        +avaliarAcesso(params: Object): Object
+    }
+
+    class RegraAcessoMensalista {
+        +avaliarAcesso(params: Object): Object
+    }
+
+    class RegraAcessoRotativo {
+        +avaliarAcesso(params: Object): Object
+    }
+
+    class AvaliadorAcessoContext {
+        -strategies: IRegraAcessoStrategy[]
+        +avaliar(params: Object): Object
     }
 
     interface IMovimentacaoRepository <<interface>> {
@@ -150,12 +174,14 @@ package "estacionamento-service" <<Rectangle>> {
 
     interface IPagamentoClient <<interface>> {
         +listarPagamentos(): Promise<Object[]>
+        +buscarPagamentoPorMovimentacao(movimentacaoId: String): Promise<Object>
     }
 
     class PagamentoHttpClient {
         -baseUrl: String
         -timeoutMs: int
         +listarPagamentos(): Promise<Object[]>
+        +buscarPagamentoPorMovimentacao(movimentacaoId: String): Promise<Object>
     }
 
     class Movimentacao {
@@ -190,6 +216,11 @@ package "estacionamento-service" <<Rectangle>> {
     EstacionamentoService --> IMovimentacaoRepository
     EstacionamentoService --> IMensalistaClient
     EstacionamentoService --> IPagamentoClient
+    EstacionamentoService --> ResumoEstacionamentoCalculator
+    EstacionamentoService --> AvaliadorAcessoContext
+    AvaliadorAcessoContext --> IRegraAcessoStrategy
+    RegraAcessoMensalista ..|> IRegraAcessoStrategy
+    RegraAcessoRotativo ..|> IRegraAcessoStrategy
     InMemoryMovimentacaoRepository ..|> IMovimentacaoRepository
     InMemoryMovimentacaoRepository --> Movimentacao
     MensalistaHttpClient ..|> IMensalistaClient
@@ -207,10 +238,15 @@ package "mensalista-service" <<Rectangle>> {
 
     class MensalistaService {
         -mensalistaRepository: IMensalistaRepository
+        -validadorCpf: ValidadorCpf
         +listar(filtroPlaca: String): Promise<Object[]>
         +buscarPorPlaca(placa: String): Promise<Object>
         +cadastrar(dados: Object): Promise<Object>
         +atualizar(id: String, dados: Object): Promise<Object>
+    }
+
+    class ValidadorCpf {
+        +validar(cpf: String): Boolean
     }
 
     interface IMensalistaRepository <<interface>> {
@@ -250,6 +286,7 @@ package "mensalista-service" <<Rectangle>> {
     Mensalista --> StatusMensalista
     MensalistaController --> MensalistaService
     MensalistaService --> IMensalistaRepository
+    MensalistaService --> ValidadorCpf
     InMemoryMensalistaRepository ..|> IMensalistaRepository
     InMemoryMensalistaRepository --> Mensalista
 }
@@ -259,6 +296,9 @@ package "pagamento-service" <<Rectangle>> {
         -pagamentoService: PagamentoService
         +calcular(req: Request, res: Response): Promise<Response>
         +registrar(req: Request, res: Response): Promise<Response>
+        +confirmar(req: Request, res: Response): Promise<Response>
+        +buscarPorId(req: Request, res: Response): Promise<Response>
+        +buscarPorMovimentacao(req: Request, res: Response): Promise<Response>
         +listar(req: Request, res: Response): Promise<Response>
     }
 
@@ -267,6 +307,9 @@ package "pagamento-service" <<Rectangle>> {
         -tarifaEngine: TarifaEngine
         +calcularTarifa(dados: Object): Promise<Object>
         +registrarPagamento(dados: Object): Promise<Object>
+        +confirmarPagamento(id: String): Promise<Object>
+        +buscarPorId(id: String): Promise<Object>
+        +buscarPorMovimentacaoId(movimentacaoId: String): Promise<Object>
         +listarPagamentos(): Promise<Object[]>
     }
 
@@ -275,6 +318,7 @@ package "pagamento-service" <<Rectangle>> {
         +listar(): Promise<Pagamento[]>
         +buscarPorId(id: String): Promise<Pagamento>
         +buscarPorMovimentacaoId(movimentacaoId: String): Promise<Pagamento>
+        +atualizar(pagamento: Pagamento): Promise<Pagamento>
     }
 
     class InMemoryPagamentoRepository {
@@ -294,6 +338,11 @@ package "pagamento-service" <<Rectangle>> {
         +calcular(permanenciaMinutos: int): Object
     }
 
+    class TarifaNoturnaStrategy {
+        -valorFixoPernoite: float
+        +calcular(permanenciaMinutos: int): Object
+    }
+
     class TarifaEngine {
         -strategy: ITarifaStrategy
         +setStrategy(strategy: ITarifaStrategy): void
@@ -301,7 +350,19 @@ package "pagamento-service" <<Rectangle>> {
     }
 
     interface IPagamentoProcessor <<interface>> {
+        +processar(valorDevido: float, valorPago: float, opcoes: Object): Promise<Object>
+    }
+
+    class DinheiroProcessor {
         +processar(valorDevido: float, valorPago: float): Object
+    }
+
+    class CartaoProcessor {
+        +processar(valorDevido: float, valorPago: float, opcoes: Object): Object
+    }
+
+    class PixProcessor {
+        +processar(valorDevido: float, valorPago: float, opcoes: Object): Promise<Object>
     }
 
     class PagamentoProcessorFactory {
@@ -316,6 +377,7 @@ package "pagamento-service" <<Rectangle>> {
         +valorPago: float
         +troco: float
         +status: StatusPagamento
+        +detalhes: Object
         +dataHora: DateTime
         +validar(): void
         +confirmar(): void
@@ -337,6 +399,11 @@ package "pagamento-service" <<Rectangle>> {
     TarifaPadraoStrategy ..|> ITarifaStrategy
     TarifaPadraoStrategy --> TabelaPreco
     TarifaDiferenciadaStrategy ..|> ITarifaStrategy
+    TarifaNoturnaStrategy ..|> ITarifaStrategy
+    DinheiroProcessor ..|> IPagamentoProcessor
+    CartaoProcessor ..|> IPagamentoProcessor
+    PixProcessor ..|> IPagamentoProcessor
+    PagamentoProcessorFactory ..> IPagamentoProcessor
     InMemoryPagamentoRepository ..|> IPagamentoRepository
     InMemoryPagamentoRepository --> Pagamento
 }
@@ -352,9 +419,24 @@ package "vaga-service" <<Rectangle>> {
     class VagaService {
         -vagaRepository: IVagaRepository
         -disponibilidadeCalculator: DisponibilidadeCalculator
+        -alocadorEngine: AlocadorVagasEngine
         +listarVagas(filtros: Object): Promise<Object[]>
+        +listarCompativeis(tipoVeiculo: String): Promise<Object[]>
         +obterDisponibilidade(): Promise<Object>
         +atualizarStatus(id: String, novoStatus: String): Promise<Object>
+    }
+
+    class AlocadorVagasEngine {
+        -strategy: ICompatibilidadeVagaStrategy
+        +filtrarVagasCompativeis(vagas: Vaga[], tipoVeiculo: String): Vaga[]
+    }
+
+    interface ICompatibilidadeVagaStrategy <<interface>> {
+        +isCompativel(tipoVeiculo: String, tipoVaga: String): Boolean
+    }
+
+    class CompatibilidadePadraoStrategy {
+        +isCompativel(tipoVeiculo: String, tipoVaga: String): Boolean
     }
 
     interface IVagaRepository <<interface>> {
@@ -386,6 +468,9 @@ package "vaga-service" <<Rectangle>> {
     VagaController --> VagaService
     VagaService --> IVagaRepository
     VagaService --> DisponibilidadeCalculator
+    VagaService --> AlocadorVagasEngine
+    AlocadorVagasEngine --> ICompatibilidadeVagaStrategy
+    CompatibilidadePadraoStrategy ..|> ICompatibilidadeVagaStrategy
     InMemoryVagaRepository ..|> IVagaRepository
     InMemoryVagaRepository --> Vaga
 }
