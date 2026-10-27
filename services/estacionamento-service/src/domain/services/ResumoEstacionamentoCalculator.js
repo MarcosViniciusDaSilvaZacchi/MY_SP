@@ -77,3 +77,4 @@ class ResumoEstacionamentoCalculator {
 }
 
 module.exports = { ResumoEstacionamentoCalculator };
+

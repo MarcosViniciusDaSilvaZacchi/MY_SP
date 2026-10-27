@@ -61,3 +61,4 @@ module.exports = {
   CompatibilidadePadraoStrategy,
   AlocadorVagasEngine,
 };
+
