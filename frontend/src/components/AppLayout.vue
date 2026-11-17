@@ -96,6 +96,16 @@
             <span>Clientes Mensalistas</span>
           </RouterLink>
         </li>
+        <li>
+          <RouterLink to="/automacao" @click="fecharMenu">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="4" y="4" width="16" height="16" rx="2"/>
+              <rect x="9" y="9" width="6" height="6"/>
+              <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>
+            </svg>
+            <span>Automação (Cancela)</span>
+          </RouterLink>
+        </li>
 
         <template v-if="auth.isAdmin">
           <li class="nav-divider">
@@ -187,6 +197,7 @@ const mapaTitulos = {
   '/saida': 'Saída e Pagamento',
   '/vagas': 'Mapa de Vagas',
   '/mensalistas': 'Clientes Mensalistas',
+  '/automacao': 'Automação da Cancela (ESP32)',
   '/relatorios': 'Relatórios e Faturamento',
   '/usuarios': 'Equipe e Acessos',
 }

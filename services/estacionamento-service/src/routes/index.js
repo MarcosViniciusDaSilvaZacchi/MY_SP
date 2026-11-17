@@ -3,6 +3,8 @@ const { SqliteMovimentacaoRepository } = require('../repositories/SqliteMoviment
 const { criarConexao } = require('../infra/SqliteDocumentStore');
 const { MensalistaHttpClient } = require('../clients/MensalistaClient');
 const { PagamentoHttpClient } = require('../clients/PagamentoClient');
+const { DispositivosHttpClient } = require('../clients/DispositivosClient');
+const { ValidadorPlaca } = require('../domain/services/ValidadorPlaca');
 const { ResumoEstacionamentoCalculator } = require('../domain/services/ResumoEstacionamentoCalculator');
 const { AvaliadorAcessoContext } = require('../domain/strategies/RegrasAcesso');
 const { EstacionamentoService } = require('../services/EstacionamentoService');
@@ -23,7 +25,9 @@ const estacionamentoService = new EstacionamentoService(
   mensalistaClient,
   pagamentoClient,
   resumoCalculator,
-  avaliadorAcesso
+  avaliadorAcesso,
+  new ValidadorPlaca(),
+  new DispositivosHttpClient() // Fase 2: abre a cancela do ESP32 após entrada/saída
 );
 const estacionamentoController = new EstacionamentoController(estacionamentoService);
 

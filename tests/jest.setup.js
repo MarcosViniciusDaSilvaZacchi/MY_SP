@@ -5,3 +5,4 @@ process.env.DB_STORAGE = ':memory:';
 process.env.MENSALISTA_SERVICE_URL = 'http://127.0.0.1:9';
 process.env.PAGAMENTO_SERVICE_URL = 'http://127.0.0.1:9';
 process.env.ESTACIONAMENTO_SERVICE_URL = 'http://127.0.0.1:9';
+process.env.DISPOSITIVOS_SERVICE_URL = 'http://127.0.0.1:9';

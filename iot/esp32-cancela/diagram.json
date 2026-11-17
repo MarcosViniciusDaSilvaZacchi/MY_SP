@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "author": "MY Service Parking",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-servo", "id": "cancela", "top": -120, "left": 220, "attrs": {} },
+    { "type": "wokwi-hc-sr04", "id": "sensorEntrada", "top": -190, "left": -200, "attrs": { "distance": "60" } },
+    { "type": "wokwi-hc-sr04", "id": "sensorSaida", "top": 190, "left": 220, "attrs": { "distance": "60" } }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+
+    [ "cancela:PWM", "esp:13", "orange", [] ],
+    [ "cancela:V+", "esp:5V", "red", [] ],
+    [ "cancela:GND", "esp:GND.1", "black", [] ],
+
+    [ "sensorEntrada:VCC", "esp:5V", "red", [] ],
+    [ "sensorEntrada:GND", "esp:GND.1", "black", [] ],
+    [ "sensorEntrada:TRIG", "esp:5", "green", [] ],
+    [ "sensorEntrada:ECHO", "esp:18", "blue", [] ],
+
+    [ "sensorSaida:VCC", "esp:5V", "red", [] ],
+    [ "sensorSaida:GND", "esp:GND.2", "black", [] ],
+    [ "sensorSaida:TRIG", "esp:19", "green", [] ],
+    [ "sensorSaida:ECHO", "esp:21", "blue", [] ]
+  ],
+  "dependencies": {}
+}

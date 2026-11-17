@@ -29,6 +29,7 @@
 11. [Fluxo de Trabalho Git (Para Equipes)](#-11-fluxo-de-trabalho-git-para-equipes)
 12. [Solução de Problemas (Troubleshooting)](#-12-solução-de-problemas-troubleshooting)
 13. [Testes Automatizados](#13-testes-automatizados)
+14. [Fase 2 — Automação da Cancela (ESP32)](#14-fase-2--automação-da-cancela-esp32)
 
 ---
 
@@ -155,6 +156,7 @@ O sistema adota o padrão **Database per Service** (cada microsserviço gerencia
 | **Mensalista Service** | `3003` | `database_mensalista.sqlite` | Cadastro de contratos mensais e verificação de adimplência/isenção por placa |
 | **Pagamento Service** | `3004` | `database_pagamento.sqlite` | Processamento de pagamentos (PIX EMVCo, Cartão TEF, Dinheiro), NSU/E2E e confirmação de transações |
 | **Vaga Service** | `3005` | `database_vaga.sqlite` | Controle de disponibilidade do pátio, criação em lote e validação de compatibilidade física |
+| **Dispositivos Service** | `3006` | `database_dispositivos.sqlite` | Fase 2: ponte com o ESP32 da cancela (fila de comandos, estado dos sensores HC-SR04 e histórico de eventos) |
 
 ---
 
@@ -530,6 +532,15 @@ Todas as chamadas podem ser feitas diretamente ao **API Gateway (`http://localho
 | `GET` | `/mensalistas/placa/:placa` | Autenticado | Verifica se uma placa pertence a um mensalista com contrato ativo |
 | `PUT` | `/mensalistas/:id/status` | Autenticado | Ativa ou inativa o contrato de um mensalista |
 
+### Automação da Cancela (`dispositivos-service`, Fase 2)
+| Método | Rota no Gateway | Permissão | Descrição |
+| :---: | :--- | :---: | :--- |
+| `GET` | `/dispositivos` | Autenticado | Estado dos ESP32: online, cancela, distância dos sensores, veículo aguardando, comandos na fila |
+| `GET` | `/dispositivos/eventos` | Autenticado | Histórico (`?limite=50&dispositivoId=&tipo=`) |
+| `POST` | `/dispositivos/comandos` | Autenticado | Abre/fecha a cancela manualmente (`acao`: `ABRIR`/`FECHAR`, `sentido`: `ENTRADA`/`SAIDA`) |
+| `POST` | `/dispositivos/:id/sync` | `X-Device-Key` | Usado pelo ESP32 a cada 500 ms |
+| `POST` | `/dispositivos/:id/eventos` | `X-Device-Key` | Usado pelo ESP32 quando um sensor ou a cancela muda |
+
 ---
 
 ## 11. Fluxo de Trabalho Git (Para Equipes)
@@ -600,6 +611,8 @@ Não é preciso subir o sistema: os testes usam SQLite em memória e não tocam 
 | `services/pagamento-service/tests/api.test.js` | Rotas HTTP de cálculo e pagamento |
 | `services/pagamento-service/tests/PagamentoService.test.js` (bloco *Tolerância*) | Tolerância de 15 min após o pagamento e cobrança da diferença |
 | `services/mensalista-service/tests/MensalistaService.test.js` | Validação de CPF, de placa e placa duplicada |
+| `services/dispositivos-service/tests/*.test.js` | Fase 2: sync do ESP32, fila de comandos (entrega, reenvio, expiração, duplicidade), eventos dos sensores e chave do dispositivo |
+| `tests/gateway-dispositivo.test.js` | Gateway: a chave do ESP32 só vale para sync/eventos; o resto exige JWT |
 | `services/vaga-service/tests/CompatibilidadeVaga.test.js` | Compatibilidade entre carro/moto e os tipos de vaga do mapa; caminhão recusado |
 | `tests/persistencia.test.js` | Dados continuam gravados depois de reabrir o banco, nos 5 serviços (CT-13) |
 
@@ -633,3 +646,23 @@ Os casos de saída e pagamento (CT-07 a CT-10) usam o veículo de exemplo `ABC1D
 ### 13.4. Docker
 
 No `docker-compose.yml`, cada serviço grava o banco em `/app/data` (variável `DB_STORAGE`), que é um **volume nomeado** (`auth-data`, `estacionamento-data` etc.): os dados sobrevivem a `docker compose down` / `up --build`. Para zerar, use `docker compose down -v`. Os Dockerfiles instalam ferramentas de compilação só durante o `npm install`, para o `sqlite3` funcionar no Alpine.
+
+---
+
+## 14. Fase 2 — Automação da Cancela (ESP32)
+
+Maquete com **1 ESP32**, **1 micro servo SG90** (cancela) e **2 sensores HC-SR04** (faixa de entrada e faixa de saída). Montagem, ligações, firmware e simulador: **[iot/README.md](iot/README.md)**.
+
+- O sensor detecta o carro parado na faixa, e as telas de **Entrada** e **Saída** mostram "Veículo detectado".
+- Registrar a entrada, ou concluir a saída com pagamento confirmado, faz o `estacionamento-service` mandar o comando **ABRIR** ao `dispositivos-service`. O ESP32 recebe o comando no próximo sync (a cada 500 ms) e levanta a cancela.
+- A cancela fecha sozinha depois que o carro passa. Ela nunca fecha com carro na frente do sensor.
+- Nova tela **Automação (Cancela)**: status do ESP32, distância medida por cada sensor, posição da cancela, botões manuais e histórico de eventos.
+- Sem hardware: `npm run simulador` imita o ESP32 pelo teclado. Teste automático do fluxo: `npm run test:e2e:iot`.
+
+| Arquivo | Conteúdo |
+| :--- | :--- |
+| `iot/esp32-cancela/esp32-cancela.ino` | Firmware (Arduino IDE): sensores, servo, máquina de estados da cancela e rede numa tarefa separada |
+| `iot/esp32-cancela/config.example.h` | Wi-Fi, IP do sistema e chave do dispositivo (copiar para `config.h`) |
+| `iot/esp32-cancela/diagram.json` | Circuito para simular no Wokwi |
+| `iot/simulador/simulador-esp32.js` | Simulador do ESP32 no terminal |
+| `services/dispositivos-service/` | Microsserviço de integração (porta 3006) |

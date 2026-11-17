@@ -9,6 +9,8 @@ const ESTACION_URL   = process.env.ESTACIONAMENTO_SERVICE_URL || 'http://localho
 const MENSALISTA_URL = process.env.MENSALISTA_SERVICE_URL     || 'http://localhost:3003';
 const PAGAMENTO_URL  = process.env.PAGAMENTO_SERVICE_URL      || 'http://localhost:3004';
 const VAGA_URL       = process.env.VAGA_SERVICE_URL           || 'http://localhost:3005';
+const DISPOSIT_URL   = process.env.DISPOSITIVOS_SERVICE_URL   || 'http://localhost:3006';
+const dispositivoOuUsuario = require('../middleware/dispositivo');
 
 const proxy = (target, pathPrefix) =>
   createProxyMiddleware({
@@ -32,5 +34,8 @@ router.use('/relatorios',     authMiddleware, proxy(ESTACION_URL, '/relatorios')
 router.use('/mensalistas',    authMiddleware, proxy(MENSALISTA_URL, '/mensalistas'));
 router.use('/pagamentos',     authMiddleware, proxy(PAGAMENTO_URL, '/pagamentos'));
 router.use('/vagas',          authMiddleware, proxy(VAGA_URL, '/vagas'));
+
+// ── Fase 2 (IoT): ESP32 entra com X-Device-Key; telas entram com JWT ──
+router.use('/dispositivos',   dispositivoOuUsuario, proxy(DISPOSIT_URL, '/dispositivos'));
 
 module.exports = router;

@@ -26,6 +26,7 @@ class EstacionamentoService {
    * @param {ResumoEstacionamentoCalculator} [resumoCalculator]
    * @param {AvaliadorAcessoContext} [avaliadorAcesso]
    * @param {ValidadorPlaca} [validadorPlaca]
+   * @param {import('../clients/DispositivosClient').IDispositivosClient} [dispositivosClient] cancela física (Fase 2)
    */
   constructor(
     movimentacaoRepository,
@@ -33,7 +34,8 @@ class EstacionamentoService {
     pagamentoClient = null,
     resumoCalculator = new ResumoEstacionamentoCalculator(),
     avaliadorAcesso = new AvaliadorAcessoContext(),
-    validadorPlaca = new ValidadorPlaca()
+    validadorPlaca = new ValidadorPlaca(),
+    dispositivosClient = null
   ) {
     this.movimentacaoRepository = movimentacaoRepository;
     this.mensalistaClient = mensalistaClient;
@@ -41,6 +43,24 @@ class EstacionamentoService {
     this.resumoCalculator = resumoCalculator;
     this.avaliadorAcesso = avaliadorAcesso;
     this.validadorPlaca = validadorPlaca;
+    this.dispositivosClient = dispositivosClient;
+  }
+
+  /**
+   * Manda o ESP32 abrir a cancela. Melhor esforço: sem dispositivo, a operação
+   * continua válida e a resposta informa que a cancela não foi acionada.
+   */
+  async _abrirCancela(sentido, mov) {
+    if (!this.dispositivosClient) return null;
+    const comando = await this.dispositivosClient.abrirCancela({
+      sentido,
+      movimentacaoId: mov.id,
+      placa: mov.placa,
+      origem: sentido === 'ENTRADA' ? 'ENTRADA_REGISTRADA' : 'SAIDA_LIBERADA',
+    });
+    return comando
+      ? { acionada: true, comandoId: comando.id, dispositivoOnline: comando.dispositivoOnline }
+      : { acionada: false, dispositivoOnline: false };
   }
 
   async listarEntradas() {
@@ -105,7 +125,8 @@ class EstacionamentoService {
     movimentacao.validar();
     await this.movimentacaoRepository.salvar(movimentacao);
 
-    return movimentacao.toJSON();
+    const cancela = await this._abrirCancela('ENTRADA', movimentacao);
+    return { ...movimentacao.toJSON(), ...(cancela ? { cancela } : {}) };
   }
 
   async buscarAberta(placa) {
@@ -198,9 +219,11 @@ class EstacionamentoService {
     mov.finalizar(agoraIso, valorFinal !== undefined ? valorFinal : 0);
     await this.movimentacaoRepository.atualizar(mov);
 
+    const cancela = await this._abrirCancela('SAIDA', mov);
     return {
       ...mov.toJSON(),
       mensagem: 'Saida registrada com sucesso',
+      ...(cancela ? { cancela } : {}),
     };
   }
 

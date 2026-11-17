@@ -7,6 +7,8 @@
       </div>
     </div>
 
+    <AvisoCancela sentido="ENTRADA" :cancela="resultado?.cancela || null" />
+
     <div class="layout-grid">
       <!-- Coluna 1: Formulário de Entrada -->
       <div class="card form-card">
@@ -257,6 +259,7 @@
 import { ref, computed, onMounted } from 'vue'
 import api from '../services/api'
 import { exportarComprovantePDF } from '../utils/exportadores'
+import AvisoCancela from '../components/AvisoCancela.vue'
 
 const placa = ref('')
 const tipoVeiculo = ref('CARRO')

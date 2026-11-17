@@ -47,6 +47,7 @@ const SERVICOS = [
       PORT: '3002',
       MENSALISTA_SERVICE_URL: 'http://localhost:3003',
       PAGAMENTO_SERVICE_URL: 'http://localhost:3004',
+      DISPOSITIVOS_SERVICE_URL: 'http://localhost:3006',
     },
   },
   {
@@ -80,6 +81,14 @@ const SERVICOS = [
     env: { PORT: '3005' },
   },
   {
+    name: 'DISPOS :3006',
+    dir: 'services/dispositivos-service',
+    entry: 'src/app.js',
+    port: 3006,
+    color: COLORS.red,
+    env: { PORT: '3006', DEVICE_API_KEY: 'my-parking-esp32-key', DISPOSITIVO_PADRAO: 'esp32-cancela-01' },
+  },
+  {
     name: 'GATEWAY :3000',
     dir: 'gateway',
     entry: 'src/app.js',
@@ -94,6 +103,8 @@ const SERVICOS = [
       MENSALISTA_SERVICE_URL: 'http://localhost:3003',
       PAGAMENTO_SERVICE_URL: 'http://localhost:3004',
       VAGA_SERVICE_URL: 'http://localhost:3005',
+      DISPOSITIVOS_SERVICE_URL: 'http://localhost:3006',
+      DEVICE_API_KEY: 'my-parking-esp32-key',
     },
   },
   {
@@ -273,9 +284,10 @@ function iniciarTodos() {
   setTimeout(() => {
     if (!encerrando) {
       console.log(`\n${COLORS.brightGreen}============================================================${COLORS.reset}`);
-      console.log(`${COLORS.bold}${COLORS.brightGreen}  ✅ Todos os 7 serviços estão ativos neste terminal!${COLORS.reset}`);
+      console.log(`${COLORS.bold}${COLORS.brightGreen}  ✅ Todos os 8 serviços estão ativos neste terminal!${COLORS.reset}`);
       console.log(`${COLORS.brightGreen}  🌐 Front-end SPA:  http://localhost:5173${COLORS.reset}`);
       console.log(`${COLORS.brightCyan}  🔀 API Gateway:    http://localhost:3000${COLORS.reset}`);
+      console.log(`${COLORS.red}  📡 ESP32 (cancela): aponte API_BASE para http://<IP deste PC>:3000/api${COLORS.reset}`);
       console.log(`${COLORS.yellow}  🔑 Login Admin:    admin@myparking.com / admin123${COLORS.reset}`);
       console.log(`${COLORS.yellow}  🔑 Login Operador: operador@myparking.com / op123${COLORS.reset}`);
       console.log(`${COLORS.dim}  (Pressione Ctrl+C a qualquer momento para parar tudo)${COLORS.reset}`);

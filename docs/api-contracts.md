@@ -224,3 +224,38 @@ Todos os erros retornam:
 | 404 | Recurso nao encontrado |
 | 409 | Conflito (ex.: veiculo ja tem entrada aberta) |
 | 502 | Servico downstream indisponivel |
+
+---
+
+## Dispositivos (Fase 2 — ESP32 da cancela)
+
+Serviço `dispositivos-service` (porta 3006), acessado pelo gateway em `/api/dispositivos`.
+As telas usam JWT. O ESP32 usa o cabeçalho `X-Device-Key`, que só vale para `sync` e `eventos` (outras rotas → `403`).
+
+### POST /api/dispositivos/{id}/sync (ESP32, a cada 500 ms)
+```json
+{ "firmware": "1.0.0", "ip": "192.168.0.50", "rssi": -61, "cancela": "FECHADA",
+  "sensores": { "ENTRADA": { "distanciaCm": 7.5, "presenca": true }, "SAIDA": { "distanciaCm": null, "presenca": false } } }
+```
+**Response 200:** `{ "comando": { "id": "...", "acao": "ABRIR", "sentido": "ENTRADA" }, "servidorEm": "..." }` (ou `"comando": null`).
+Um comando entregue e não confirmado em 3 s é entregue de novo, e expira em 30 s.
+
+### POST /api/dispositivos/{id}/eventos (ESP32)
+```json
+{ "tipo": "CANCELA_ABERTA", "sentido": "ENTRADA", "comandoId": "...", "distanciaCm": 6.2, "detalhe": null }
+```
+`tipo`: `VEICULO_DETECTADO` | `VEICULO_SAIU` (exigem `sentido`) | `CANCELA_ABERTA` | `CANCELA_FECHADA` | `COMANDO_RECUSADO`.
+Com `comandoId`, confirma o comando (`EXECUTADO`, ou `FALHOU` se recusado). **Response 201.**
+
+### POST /api/dispositivos/comandos (telas e estacionamento-service)
+```json
+{ "acao": "ABRIR|FECHAR", "sentido": "ENTRADA|SAIDA", "dispositivoId": "esp32-cancela-01", "origem": "OPERADOR" }
+```
+**Response 202:** o comando (`status: PENDENTE`, `dispositivoOnline`, `repetido`). Pedido igual ainda na fila → devolve o mesmo comando. Ordem oposta na fila → a anterior vira `FALHOU`.
+O `estacionamento-service` cria `ABRIR` sozinho após `POST /entradas` (201) e `POST /saidas` (200), e as respostas trazem `cancela: { acionada, comandoId, dispositivoOnline }`.
+
+### GET /api/dispositivos · GET /api/dispositivos/{id}
+Estado: `online` (sync nos últimos 5 s), `cancela`, `sensores`, `veiculoAguardando: { ENTRADA, SAIDA }`, `comandosPendentes`.
+
+### GET /api/dispositivos/eventos?limite=50&dispositivoId=&tipo=
+Histórico, do mais recente para o mais antigo (guardado em SQLite).

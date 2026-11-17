@@ -2,7 +2,7 @@ Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host "   Parando MY Service Parking...         " -ForegroundColor Cyan
 Write-Host "=========================================" -ForegroundColor Cyan
 
-$ports = @(3000, 3001, 3002, 3003, 3004, 3005, 5173)
+$ports = @(3000, 3001, 3002, 3003, 3004, 3005, 3006, 5173)
 foreach ($port in $ports) {
     $conn = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
     if ($conn) {

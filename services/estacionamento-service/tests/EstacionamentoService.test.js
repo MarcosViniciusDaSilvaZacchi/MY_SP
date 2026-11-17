@@ -149,3 +149,54 @@ describe('Tolerância depois do pagamento (saída)', () => {
     await ctx.repo.fechar();
   });
 });
+
+describe('Cancela física (Fase 2 — ESP32)', () => {
+  const montarComCancela = (respostaCancela) => {
+    const chamadas = [];
+    const repo = new SqliteMovimentacaoRepository(
+      new Sequelize({ dialect: 'sqlite', storage: ':memory:', logging: false }),
+      { seed: false }
+    );
+    const dispositivosClient = { abrirCancela: async (dados) => { chamadas.push(dados); return respostaCancela; } };
+    const service = new EstacionamentoService(
+      repo,
+      { verificarMensalistaPorPlaca: async () => null },
+      { buscarPagamentoPorMovimentacao: async () => null, listarPagamentos: async () => [] },
+      undefined, undefined, undefined,
+      dispositivosClient
+    );
+    return { repo, service, chamadas };
+  };
+
+  test('entrada registrada manda abrir a cancela no sentido ENTRADA', async () => {
+    const ctx = montarComCancela({ id: 'c1', status: 'PENDENTE', dispositivoOnline: true });
+    const mov = await ctx.service.registrarEntrada({ placa: 'BRA2E19' });
+    expect(ctx.chamadas).toEqual([expect.objectContaining({ sentido: 'ENTRADA', placa: 'BRA2E19', movimentacaoId: mov.id })]);
+    expect(mov.cancela).toEqual({ acionada: true, comandoId: 'c1', dispositivoOnline: true });
+    await ctx.repo.fechar();
+  });
+
+  test('saída liberada manda abrir no sentido SAIDA', async () => {
+    const ctx = montarComCancela({ id: 'c2', status: 'PENDENTE', dispositivoOnline: true });
+    await ctx.repo.salvar(new Movimentacao({ id: 'c9', placa: 'BRA2E19', dataHoraEntrada: minutosAtras(5) }));
+    const saida = await ctx.service.registrarSaida({ movimentacaoId: 'c9' });
+    expect(ctx.chamadas[0]).toMatchObject({ sentido: 'SAIDA', movimentacaoId: 'c9' });
+    expect(saida.cancela.acionada).toBe(true);
+    await ctx.repo.fechar();
+  });
+
+  test('sem dispositivo, a entrada vale do mesmo jeito e informa que a cancela não foi acionada', async () => {
+    const ctx = montarComCancela(null);
+    const mov = await ctx.service.registrarEntrada({ placa: 'BRA2E19' });
+    expect(mov).toMatchObject({ status: 'ABERTA', cancela: { acionada: false } });
+    await ctx.repo.fechar();
+  });
+
+  test('saída bloqueada (402) não abre a cancela', async () => {
+    const ctx = montarComCancela({ id: 'c3', status: 'PENDENTE', dispositivoOnline: true });
+    await ctx.repo.salvar(new Movimentacao({ id: 'b1', placa: 'BRA2E19', dataHoraEntrada: minutosAtras(47) }));
+    await expect(ctx.service.registrarSaida({ movimentacaoId: 'b1' })).rejects.toMatchObject({ statusCode: 402 });
+    expect(ctx.chamadas).toHaveLength(0);
+    await ctx.repo.fechar();
+  });
+});

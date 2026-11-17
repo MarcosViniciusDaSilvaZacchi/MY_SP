@@ -25,6 +25,8 @@
       </div>
     </div>
 
+    <AvisoCancela sentido="SAIDA" :cancela="passo === 3 ? recibo.cancela || null : null" />
+
     <!-- PASSO 1: Busca do Veículo -->
     <div v-if="passo === 1" class="step1-grid">
       <div class="card form-card">
@@ -605,6 +607,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../services/api'
 import { exportarComprovantePDF } from '../utils/exportadores'
+import AvisoCancela from '../components/AvisoCancela.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -910,7 +913,9 @@ async function confirmarSaida() {
       dataHoraSaida: saidaRes.data.dataHoraSaida || new Date().toISOString(),
       permanenciaMinutos: permanenciaMinutos.value,
       tipo: movimentacao.value.tipo,
-      valorCobrado: devidoNum,
+      // Valor gravado pelo servidor (inclui pagamento complementar, se houve)
+      valorCobrado: Number(saidaRes.data.valorCobrado ?? devidoNum),
+      cancela: saidaRes.data.cancela || null,
       formaPagamento: devidoNum > 0 ? (pagamentoAtual.value?.forma || formaPagamento.value) : 'Isento',
       troco: pagamentoAtual.value?.troco || 0,
       detalhes: pagamentoAtual.value?.detalhes || {},

@@ -9,11 +9,14 @@
     "install:all": "node iniciar.js --install-only",
     "stop": "powershell -ExecutionPolicy Bypass -File parar.ps1",
     "test": "jest",
-    "test:e2e": "node tests/e2e/fluxo-completo.js"
+    "test:e2e": "node tests/e2e/fluxo-completo.js",
+    "simulador": "node iot/simulador/simulador-esp32.js",
+    "test:e2e:iot": "node tests/e2e/automacao-cancela.js"
   },
   "devDependencies": {
     "jest": "^29.7.0",
-    "supertest": "^7.0.0"
+    "supertest": "^7.0.0",
+    "jsonwebtoken": "^9.0.2"
   },
   "jest": {
     "testEnvironment": "node",

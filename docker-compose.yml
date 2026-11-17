@@ -32,12 +32,15 @@ services:
       MENSALISTA_SERVICE_URL: http://mensalista-service:3003
       PAGAMENTO_SERVICE_URL: http://pagamento-service:3004
       VAGA_SERVICE_URL: http://vaga-service:3005
+      DISPOSITIVOS_SERVICE_URL: http://dispositivos-service:3006
+      DEVICE_API_KEY: ${DEVICE_API_KEY:-my-parking-esp32-key}
     depends_on:
       - auth-service
       - estacionamento-service
       - mensalista-service
       - pagamento-service
       - vaga-service
+      - dispositivos-service
     networks:
       - parking-net
     restart: unless-stopped
@@ -69,6 +72,7 @@ services:
       PORT: 3002
       MENSALISTA_SERVICE_URL: http://mensalista-service:3003
       PAGAMENTO_SERVICE_URL: http://pagamento-service:3004
+      DISPOSITIVOS_SERVICE_URL: http://dispositivos-service:3006
       DB_STORAGE: /app/data/database_estacionamento.sqlite
     volumes:
       - estacionamento-data:/app/data
@@ -122,6 +126,23 @@ services:
       - parking-net
     restart: unless-stopped
 
+  # ── Dispositivos Service (Fase 2: ESP32 + cancela + sensores) ─────
+  dispositivos-service:
+    build: ./services/dispositivos-service
+    container_name: my-parking-dispositivos
+    ports:
+      - "3006:3006"
+    environment:
+      PORT: 3006
+      DEVICE_API_KEY: ${DEVICE_API_KEY:-my-parking-esp32-key}
+      DISPOSITIVO_PADRAO: esp32-cancela-01
+      DB_STORAGE: /app/data/database_dispositivos.sqlite
+    volumes:
+      - dispositivos-data:/app/data
+    networks:
+      - parking-net
+    restart: unless-stopped
+
 networks:
   parking-net:
     driver: bridge
@@ -133,3 +154,4 @@ volumes:
   mensalista-data:
   pagamento-data:
   vaga-data:
+  dispositivos-data:

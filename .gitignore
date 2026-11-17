@@ -30,3 +30,6 @@ desktop.ini
 
 # Estado da última execução do teste ponta a ponta
 tests/e2e/.ultima-execucao.json
+
+# Configuração local do ESP32 (Wi-Fi e chave): copie de config.example.h
+iot/esp32-cancela/config.h

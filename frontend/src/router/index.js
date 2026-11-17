@@ -19,6 +19,7 @@ const routes = [
       { path: 'saida',        name: 'Saida',        component: () => import('../views/SaidaView.vue') },
       { path: 'mensalistas',  name: 'Mensalistas',  component: () => import('../views/MensalistasView.vue') },
       { path: 'vagas',        name: 'Vagas',        component: () => import('../views/VagasView.vue') },
+      { path: 'automacao',    name: 'Automacao',    component: () => import('../views/AutomacaoView.vue') },
       { path: 'relatorios',   name: 'Relatorios',   component: () => import('../views/RelatoriosView.vue'), meta: { requiresAdmin: true } },
       { path: 'usuarios',     name: 'Usuarios',     component: () => import('../views/UsuariosView.vue'),   meta: { requiresAdmin: true } },
     ],
