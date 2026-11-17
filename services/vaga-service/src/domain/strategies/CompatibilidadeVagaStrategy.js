@@ -1,11 +1,16 @@
 // ──────────────────────────────────────────────────────────────────
 // Strategy Pattern para Compatibilidade de Vagas (OCP / LSP / SRP)
 // C4 Nível 3: Vaga Strategy
-// Responsabilidade: Determinar a compatibilidade física e preferencial
-// de alocação entre o tipo de veículo e o tipo de vaga
+// Responsabilidade: Determinar se um tipo de veículo pode ocupar um tipo de vaga.
+//
+// O estacionamento recebe apenas CARRO e MOTO (caminhão não entra).
+// Os tipos de vaga são os do mapa: COMUM, PCD, IDOSO, GESTANTE e ELETRICO.
+// O direito às vagas especiais (credencial PCD/idoso etc.) é conferido pelo operador.
 // ──────────────────────────────────────────────────────────────────
 
 const { TipoVaga } = require('../enums/VagaEnums');
+
+const VEICULOS_ACEITOS = Object.freeze(['CARRO', 'MOTO']);
 
 class ICompatibilidadeVagaStrategy {
   /**
@@ -21,25 +26,14 @@ class ICompatibilidadeVagaStrategy {
 class CompatibilidadePadraoStrategy extends ICompatibilidadeVagaStrategy {
   isCompativel(tipoVeiculo, tipoVaga) {
     const vTipo = String(tipoVeiculo || 'CARRO').toUpperCase().trim();
-    const sTipo = String(tipoVaga || 'CARRO').toUpperCase().trim();
+    const sTipo = String(tipoVaga || TipoVaga.COMUM).toUpperCase().trim();
 
-    // Vaga especial (PCD / IDOSO) exige regra específica ou preferencial
-    if (sTipo === TipoVaga.PCD || sTipo === TipoVaga.IDOSO) {
-      return vTipo === sTipo || vTipo === TipoVaga.CARRO;
-    }
+    if (!VEICULOS_ACEITOS.includes(vTipo)) return false;
+    if (!Object.values(TipoVaga).includes(sTipo)) return false;
 
-    // Moto pode ocupar vaga de Moto ou Carro
-    if (vTipo === TipoVaga.MOTO) {
-      return sTipo === TipoVaga.MOTO || sTipo === TipoVaga.CARRO;
-    }
-
-    // Caminhão só cabe em vaga de Caminhão
-    if (vTipo === TipoVaga.CAMINHAO) {
-      return sTipo === TipoVaga.CAMINHAO;
-    }
-
-    // Carro padrão cabe em vaga de Carro ou Caminhão
-    return sTipo === TipoVaga.CARRO || sTipo === TipoVaga.CAMINHAO;
+    // Vaga de recarga é para carro elétrico; moto usa as demais
+    if (sTipo === TipoVaga.ELETRICO) return vTipo === 'CARRO';
+    return true;
   }
 }
 
@@ -57,8 +51,8 @@ class AlocadorVagasEngine {
 }
 
 module.exports = {
+  VEICULOS_ACEITOS,
   ICompatibilidadeVagaStrategy,
   CompatibilidadePadraoStrategy,
   AlocadorVagasEngine,
 };
-

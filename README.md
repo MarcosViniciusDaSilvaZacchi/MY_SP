@@ -115,6 +115,7 @@ Na primeira inicialização, o serviço de autenticação (`auth-service`) cria 
   - **Cartão de Crédito / Débito (TEF):** Validação algorítmica de numeração de cartão, identificação automática da bandeira (Visa, Mastercard, Elo, Amex, Hipercard), seleção de modalidade (Crédito à vista, parcelado ou Débito) e emissão de código **NSU** e **Código de Autorização**.
   - **Dinheiro em Espécie:** Cálculo automático de troco em tempo real e validação de valor recebido suficiente.
 - **Trava de Segurança na Cancela:** O back-end bloqueia a baixa de saída (HTTP `402 Payment Required`) caso um veículo avulso tente sair sem um pagamento confirmado vinculado ao registro.
+- **Tolerância Após o Pagamento (15 min):** Depois de pagar, o cliente tem 15 minutos para sair (configurável por `TOLERANCIA_POS_PAGAMENTO_MINUTOS` no `pagamento-service`). Passado esse prazo, a saída volta a ser bloqueada e a tela de Saída cobra **só a diferença** entre a tarifa atual e o que já foi pago (pagamento complementar). Ex.: carro pagou R$ 10,00 aos 50 min e só saiu aos 80 min → paga mais R$ 5,00.
 - **Recibo Fiscal de Saída (PDF):** Exportação imediata do comprovante de saída com detalhamento de permanência, forma de pagamento, NSU/E2E ID e valor pago.
 
 ### 4.4. Mapa e Gestão de Vagas
@@ -597,7 +598,9 @@ Não é preciso subir o sistema: os testes usam SQLite em memória e não tocam 
 | `services/pagamento-service/tests/TarifaPorPorte.test.js` | Tarifa de carro e moto nos valores de limite (CT-05, CT-11) e entradas inválidas (CT-06) |
 | `services/pagamento-service/tests/PagamentoService.test.js` | Valor calculado no servidor, troco (CT-07, CT-08), valor adulterado (CT-10) e PIX pendente (CT-12) |
 | `services/pagamento-service/tests/api.test.js` | Rotas HTTP de cálculo e pagamento |
-| `services/mensalista-service/tests/MensalistaService.test.js` | Validação de CPF e placa duplicada |
+| `services/pagamento-service/tests/PagamentoService.test.js` (bloco *Tolerância*) | Tolerância de 15 min após o pagamento e cobrança da diferença |
+| `services/mensalista-service/tests/MensalistaService.test.js` | Validação de CPF, de placa e placa duplicada |
+| `services/vaga-service/tests/CompatibilidadeVaga.test.js` | Compatibilidade entre carro/moto e os tipos de vaga do mapa; caminhão recusado |
 | `tests/persistencia.test.js` | Dados continuam gravados depois de reabrir o banco, nos 5 serviços (CT-13) |
 
 ### 13.2. Teste ponta a ponta (sistema rodando)
@@ -623,3 +626,10 @@ Os casos de saída e pagamento (CT-07 a CT-10) usam o veículo de exemplo `ABC1D
 | BUG-04 (Médio) | O back-end aceitava qualquer placa | Validação dos padrões antigo e Mercosul no back-end |
 | BUG-05 (Crítico) | Todos os dados sumiam ao reiniciar (repositórios em memória) | Os 5 serviços gravam em SQLite via Sequelize |
 | — | CPF com 10 ou 12 dígitos era aceito sem validação | Qualquer CPF inválido é recusado |
+| — | Cliente pagava e podia ficar horas sem cobrança da diferença | Tolerância de 15 min após o pagamento; depois disso, pagamento complementar |
+| — | Cadastro de mensalista aceitava qualquer placa | Mesma validação de placa da entrada (antigo e Mercosul) |
+| — | `vaga-service` tinha regras de vaga de caminhão (tipos que nem existem no mapa) | Compatibilidade refeita para carro e moto nos tipos COMUM, PCD, IDOSO, GESTANTE e ELETRICO |
+
+### 13.4. Docker
+
+No `docker-compose.yml`, cada serviço grava o banco em `/app/data` (variável `DB_STORAGE`), que é um **volume nomeado** (`auth-data`, `estacionamento-data` etc.): os dados sobrevivem a `docker compose down` / `up --build`. Para zerar, use `docker compose down -v`. Os Dockerfiles instalam ferramentas de compilação só durante o `npm install`, para o `sqlite3` funcionar no Alpine.

@@ -6,15 +6,23 @@
 const { Mensalista } = require('../domain/entities/Mensalista');
 const { StatusMensalista } = require('../domain/enums/StatusMensalista');
 const { ValidadorCpf } = require('../domain/services/ValidadorCpf');
+const { ValidadorPlaca } = require('../domain/services/ValidadorPlaca');
+
+function erroPlacaInvalida() {
+  const err = new Error('Placa inválida. Use o padrão antigo (ABC1234) ou o Mercosul (ABC1D23).');
+  err.statusCode = 400;
+  return err;
+}
 
 class MensalistaService {
   /**
    * @param {import('../repositories/IMensalistaRepository').IMensalistaRepository} mensalistaRepository
    * @param {ValidadorCpf} [validadorCpf]
    */
-  constructor(mensalistaRepository, validadorCpf = new ValidadorCpf()) {
+  constructor(mensalistaRepository, validadorCpf = new ValidadorCpf(), validadorPlaca = new ValidadorPlaca()) {
     this.mensalistaRepository = mensalistaRepository;
     this.validadorCpf = validadorCpf;
+    this.validadorPlaca = validadorPlaca;
   }
 
   async listar(filtroPlaca) {
@@ -29,7 +37,7 @@ class MensalistaService {
       throw err;
     }
 
-    const mensalista = await this.mensalistaRepository.buscarPorPlaca(placa);
+    const mensalista = await this.mensalistaRepository.buscarPorPlaca(this.validadorPlaca.normalizar(placa));
     if (!mensalista) {
       const err = new Error('Mensalista nao encontrado para essa placa');
       err.statusCode = 404;
@@ -39,12 +47,16 @@ class MensalistaService {
     return mensalista.toJSON();
   }
 
-  async cadastrar({ nome, cpf, email, placa, vencimento, planoMensal }) {
-    if (!nome || !cpf || !placa || !vencimento) {
+  async cadastrar({ nome, cpf, email, placa: placaInformada, vencimento, planoMensal }) {
+    if (!nome || !cpf || !placaInformada || !vencimento) {
       const err = new Error('nome, cpf, placa e vencimento sao obrigatorios');
       err.statusCode = 400;
       throw err;
     }
+
+    // Mesma regra de placa do estacionamento-service: senão o mensalista nunca seria reconhecido na entrada
+    if (!this.validadorPlaca.validar(placaInformada)) throw erroPlacaInvalida();
+    const placa = this.validadorPlaca.normalizar(placaInformada);
 
     // Validação de integridade do CPF delegada ao serviço especializado (SRP & DIP)
     // Qualquer CPF que não tenha 11 dígitos válidos é recusado (antes, 10 ou 12 dígitos passavam sem validação)
@@ -85,6 +97,11 @@ class MensalistaService {
       const err = new Error('Mensalista nao encontrado');
       err.statusCode = 404;
       throw err;
+    }
+
+    if (dados.placa !== undefined) {
+      if (!this.validadorPlaca.validar(dados.placa)) throw erroPlacaInvalida();
+      dados = { ...dados, placa: this.validadorPlaca.normalizar(dados.placa) };
     }
 
     // Se estiver alterando a placa, verificar se outra pessoa já possui a nova placa

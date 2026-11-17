@@ -147,7 +147,9 @@
               <span class="s-label">Tarifa Aplicada</span>
               <span v-if="dentroCarencia" class="text-green font-semibold">Isento (Tolerância de 10 min)</span>
               <span v-else-if="movimentacao.tipo === 'MENSALISTA'" class="text-green font-semibold">Plano Mensalista Ativo</span>
-              <span v-else class="text-slate font-semibold">R$ 8,00 por hora</span>
+              <span v-else class="text-slate font-semibold">
+                R$ 10,00 a 1ª hora + R$ 5,00 por hora adicional{{ movimentacao.tipoVeiculo === 'MOTO' ? ' (moto: 50%)' : '' }}
+              </span>
             </div>
           </div>
         </div>
@@ -155,7 +157,7 @@
         <!-- Visor do Valor -->
         <div class="saldo-card" :class="{ 'saldo-zero': Number(valorDevido) === 0 || pagamentoConfirmado }">
           <span class="saldo-label">
-            {{ pagamentoConfirmado ? 'PAGAMENTO CONFIRMADO' : 'VALOR TOTAL A PAGAR' }}
+            {{ pagamentoConfirmado ? 'PAGAMENTO CONFIRMADO' : cobrancaComplementar ? 'DIFERENÇA A PAGAR' : 'VALOR TOTAL A PAGAR' }}
           </span>
           <div class="saldo-amount">
             R$ {{ Number(valorDevido).toFixed(2) }}
@@ -166,6 +168,10 @@
                 <polyline points="20 6 9 17 4 12" />
               </svg>
               Pagamento recebido via {{ pagamentoAtual.forma }} — Saída liberada.
+            </span>
+            <span v-else-if="cobrancaComplementar">
+              A tolerância de {{ cobrancaComplementar.toleranciaMinutos }} min após o pagamento expirou.
+              Já pago: R$ {{ Number(cobrancaComplementar.valorJaPago).toFixed(2) }} de R$ {{ Number(cobrancaComplementar.valorTotal).toFixed(2) }}.
             </span>
             <span v-else-if="movimentacao.tipo === 'MENSALISTA'">
               Cliente mensalista em dia. Sem cobrança adicional.
@@ -618,6 +624,7 @@ const horarioSaidaPrevisto = ref(new Date().toISOString())
 const formaPagamento = ref('PIX')
 const valorPago = ref('')
 const pagamentoAtual = ref(null)
+const cobrancaComplementar = ref(null)
 const copiado = ref(false)
 let pollTimer = null
 
@@ -707,6 +714,7 @@ async function buscar() {
   loading.value = true
   error.value = ''
   pagamentoAtual.value = null
+  cobrancaComplementar.value = null
   pararPollingPix()
 
   try {
@@ -732,12 +740,22 @@ async function buscar() {
       })
       valorDevido.value = Number(calcRes.data.valorCalculado ?? calcRes.data.valor ?? 0).toFixed(2)
       dentroCarencia.value = !!calcRes.data.dentroCarencia
+      // Pagou antes, mas a tolerância pós-pagamento expirou: cobra-se só a diferença
+      cobrancaComplementar.value = calcRes.data.complementar
+        ? { valorJaPago: calcRes.data.valorJaPago, valorTotal: calcRes.data.valorTotal, toleranciaMinutos: calcRes.data.toleranciaMinutos }
+        : null
 
       try {
         const pagExistente = await api.get(`/pagamentos/movimentacao/${res.data.id}`)
-        if (pagExistente.data) {
+        const precisaComplementar = pagExistente.data?.status === 'CONFIRMADO'
+          && pagExistente.data?.situacaoSaida?.quitado === false
+        if (pagExistente.data && !precisaComplementar) {
           pagamentoAtual.value = pagExistente.data
           formaPagamento.value = pagExistente.data.forma || 'PIX'
+          if (pagExistente.data.status === 'CONFIRMADO') {
+            // Já pago e dentro da tolerância: o visor mostra o total recebido
+            valorDevido.value = Number(pagExistente.data.valorTotalPago ?? pagExistente.data.valorCalculado ?? 0).toFixed(2)
+          }
           if (pagExistente.data.status === 'PENDENTE') {
             iniciarPollingPix(pagExistente.data.id)
           }
@@ -933,6 +951,7 @@ function reiniciar() {
   valorDevido.value = '0.00'
   dentroCarencia.value = false
   pagamentoAtual.value = null
+  cobrancaComplementar.value = null
   error.value = ''
   carregarVeiculosNoPatio()
 }

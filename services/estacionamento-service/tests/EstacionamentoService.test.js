@@ -123,3 +123,29 @@ describe('Saída e trava da cancela (F3-C2)', () => {
     await ctx.repo.fechar();
   });
 });
+
+describe('Tolerância depois do pagamento (saída)', () => {
+  const avulso = () => new Movimentacao({ id: 't1', placa: 'ABC1D23', dataHoraEntrada: minutosAtras(80) });
+
+  test('bloqueia a saída (402) quando a tolerância expirou e há diferença a pagar', async () => {
+    const ctx = montar({ pagamento: {
+      status: 'CONFIRMADO', valorCalculado: 10, valorTotalPago: 10,
+      situacaoSaida: { quitado: false, saldoDevido: 5, toleranciaMinutos: 15 },
+    } });
+    await ctx.repo.salvar(avulso());
+    await expect(ctx.service.registrarSaida({ movimentacaoId: 't1' }))
+      .rejects.toMatchObject({ statusCode: 402, message: expect.stringContaining('5.00') });
+    expect((await ctx.repo.buscarPorId('t1')).status).toBe('ABERTA');
+    await ctx.repo.fechar();
+  });
+
+  test('com o complementar pago, registra o total pago (R$ 15,00)', async () => {
+    const ctx = montar({ pagamento: {
+      status: 'CONFIRMADO', valorCalculado: 5, valorTotalPago: 15,
+      situacaoSaida: { quitado: true, saldoDevido: 0, toleranciaMinutos: 15 },
+    } });
+    await ctx.repo.salvar(avulso());
+    expect(await ctx.service.registrarSaida({ movimentacaoId: 't1' })).toMatchObject({ status: 'FINALIZADA', valorCobrado: 15 });
+    await ctx.repo.fechar();
+  });
+});

@@ -29,3 +29,18 @@ test('recusa a segunda mensalidade para a mesma placa (409)', async () => {
   await service.cadastrar(dados('529.982.247-25'));
   await expect(service.cadastrar(dados('529.982.247-25'))).rejects.toMatchObject({ statusCode: 409 });
 });
+
+describe('Validação de placa', () => {
+  test('normaliza a placa ("abc-1234" → "ABC1234")', async () => {
+    expect((await service.cadastrar(dados('529.982.247-25', 'abc-1234'))).placa).toBe('ABC1234');
+  });
+
+  test.each(['', 'AB1234', 'ABCD123', '1234ABC', 'ABC12345'])('recusa a placa inválida %p com 400', async (placa) => {
+    await expect(service.cadastrar(dados('529.982.247-25', placa))).rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  test('recusa placa inválida também na alteração', async () => {
+    const m = await service.cadastrar(dados('529.982.247-25'));
+    await expect(service.atualizar(m.id, { placa: 'XYZ' })).rejects.toMatchObject({ statusCode: 400 });
+  });
+});

@@ -180,8 +180,19 @@ class EstacionamentoService {
           402
         );
       }
+      // Tolerância pós-pagamento expirada: falta pagar a diferença (calculada pelo pagamento-service)
+      const situacao = pagMov.situacaoSaida;
+      if (situacao && situacao.quitado === false) {
+        const err = erro(
+          `O tempo de tolerância de ${situacao.toleranciaMinutos} min após o pagamento expirou. `
+            + `Pague a diferença de R$ ${Number(situacao.saldoDevido).toFixed(2)} para liberar a saída.`,
+          402
+        );
+        err.detalhes = { saldoDevido: situacao.saldoDevido };
+        throw err;
+      }
       // O valor registrado é o calculado pelo pagamento-service, nunca o enviado pelo cliente
-      valorFinal = Number(pagMov.valorCalculado ?? pagMov.valor ?? 0);
+      valorFinal = Number(pagMov.valorTotalPago ?? pagMov.valorCalculado ?? pagMov.valor ?? 0);
     }
 
     mov.finalizar(agoraIso, valorFinal !== undefined ? valorFinal : 0);

@@ -52,6 +52,9 @@ services:
       PORT: 3001
       JWT_SECRET: ${JWT_SECRET:-my-parking-secret}
       JWT_EXPIRES_IN: 8h
+      DB_STORAGE: /app/data/database_auth.sqlite
+    volumes:
+      - auth-data:/app/data
     networks:
       - parking-net
     restart: unless-stopped
@@ -64,6 +67,11 @@ services:
       - "3002:3002"
     environment:
       PORT: 3002
+      MENSALISTA_SERVICE_URL: http://mensalista-service:3003
+      PAGAMENTO_SERVICE_URL: http://pagamento-service:3004
+      DB_STORAGE: /app/data/database_estacionamento.sqlite
+    volumes:
+      - estacionamento-data:/app/data
     networks:
       - parking-net
     restart: unless-stopped
@@ -76,6 +84,9 @@ services:
       - "3003:3003"
     environment:
       PORT: 3003
+      DB_STORAGE: /app/data/database_mensalista.sqlite
+    volumes:
+      - mensalista-data:/app/data
     networks:
       - parking-net
     restart: unless-stopped
@@ -89,6 +100,9 @@ services:
     environment:
       PORT: 3004
       ESTACIONAMENTO_SERVICE_URL: http://estacionamento-service:3002
+      DB_STORAGE: /app/data/database_pagamento.sqlite
+    volumes:
+      - pagamento-data:/app/data
     networks:
       - parking-net
     restart: unless-stopped
@@ -101,6 +115,9 @@ services:
       - "3005:3005"
     environment:
       PORT: 3005
+      DB_STORAGE: /app/data/database_vaga.sqlite
+    volumes:
+      - vaga-data:/app/data
     networks:
       - parking-net
     restart: unless-stopped
@@ -108,3 +125,11 @@ services:
 networks:
   parking-net:
     driver: bridge
+
+# Volumes nomeados: os bancos SQLite sobrevivem à recriação dos containers
+volumes:
+  auth-data:
+  estacionamento-data:
+  mensalista-data:
+  pagamento-data:
+  vaga-data:

@@ -96,3 +96,40 @@ describe('PIX (CT-12)', () => {
     expect(await repo.listar()).toHaveLength(1);
   });
 });
+
+describe('Tolerância depois do pagamento', () => {
+  const { Pagamento } = require('../src/domain/entities/PagamentoEntities');
+  const pagoHa = (minutos, valor, movimentacaoId = 'carro61') => new Pagamento({
+    id: `p${minutos}`, movimentacaoId, forma: 'CARTAO', valorCalculado: valor, valorPago: valor,
+    status: 'CONFIRMADO', dataHora: new Date(Date.now() - minutos * 60000).toISOString(),
+  });
+
+  test('pagou há 5 min (dentro da tolerância de 15): quitado, nada a pagar e sem novo pagamento', async () => {
+    await repo.salvar(pagoHa(5, 10)); // pagou R$ 10 quando a tarifa era R$ 10; agora é R$ 15
+    const calc = await service.calcularTarifa({ movimentacaoId: 'carro61' });
+    expect(calc).toMatchObject({ quitado: true, valorCalculado: 0, valorJaPago: 10, complementar: false });
+    const p = await service.registrarPagamento({ movimentacaoId: 'carro61', forma: 'CARTAO' });
+    expect(p.id).toBe('p5');
+    expect(await repo.listar()).toHaveLength(1);
+  });
+
+  test('pagou há 20 min (tolerância expirada): cobra só a diferença de R$ 5,00', async () => {
+    await repo.salvar(pagoHa(20, 10));
+    const calc = await service.calcularTarifa({ movimentacaoId: 'carro61' });
+    expect(calc).toMatchObject({ quitado: false, toleranciaExpirada: true, complementar: true, valorCalculado: 5, valorTotal: 15 });
+
+    const sit = await service.buscarPorMovimentacaoId('carro61');
+    expect(sit.situacaoSaida).toMatchObject({ quitado: false, saldoDevido: 5 });
+
+    const comp = await service.registrarPagamento({ movimentacaoId: 'carro61', forma: 'DINHEIRO', valorPago: 5 });
+    expect(comp).toMatchObject({ status: 'CONFIRMADO', valorCalculado: 5, detalhes: expect.objectContaining({ complementar: true }) });
+
+    const depois = await service.buscarPorMovimentacaoId('carro61');
+    expect(depois).toMatchObject({ valorTotalPago: 15, situacaoSaida: expect.objectContaining({ quitado: true }) });
+  });
+
+  test('tolerância expirada mas o valor pago ainda cobre a tarifa atual: quitado', async () => {
+    await repo.salvar(pagoHa(30, 15)); // R$ 15 cobre até 2 h; carro61 está com 61 min
+    expect(await service.calcularTarifa({ movimentacaoId: 'carro61' })).toMatchObject({ quitado: true, valorCalculado: 0 });
+  });
+});

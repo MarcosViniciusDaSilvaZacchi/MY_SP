@@ -156,6 +156,23 @@ O valor devido é calculado no servidor; `valor` e `permanenciaMinutos` enviados
 ```
 **Errors:** `400` valor em dinheiro insuficiente | `404` movimentação não encontrada | `409` movimentação já encerrada
 
+### Tolerância após o pagamento
+Depois de pago, o veículo tem **15 min** para sair (`TOLERANCIA_POS_PAGAMENTO_MINUTOS`). Passado o prazo:
+- `POST /api/pagamentos/calcular` devolve em `valorCalculado` **só a diferença** a pagar, com `complementar: true`, `valorTotal` e `valorJaPago`;
+- `POST /api/pagamentos` cria um pagamento complementar (`detalhes.complementar: true`) com essa diferença;
+- `POST /api/saidas` responde `402` até a diferença ser paga.
+
+Dentro da tolerância, um novo `POST /api/pagamentos` devolve o pagamento já feito (não cobra de novo).
+
+### GET /api/pagamentos/movimentacao/{movimentacaoId}
+Devolve o pagamento mais relevante (PIX pendente ou o último confirmado), mais:
+```json
+{ "valorTotalPago": 15.00,
+  "situacaoSaida": { "quitado": false, "saldoDevido": 5.00, "valorTotal": 20.00, "valorJaPago": 15.00,
+                     "toleranciaExpirada": true, "toleranciaMinutos": 15, "pagamentoPendenteId": null } }
+```
+`situacaoSaida` só aparece enquanto a movimentação está aberta.
+
 ---
 
 ## Vagas
