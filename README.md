@@ -28,6 +28,7 @@
 10. [Referência de Endpoints da API](#-10-referência-de-endpoints-da-api)
 11. [Fluxo de Trabalho Git (Para Equipes)](#-11-fluxo-de-trabalho-git-para-equipes)
 12. [Solução de Problemas (Troubleshooting)](#-12-solução-de-problemas-troubleshooting)
+13. [Testes Automatizados](#13-testes-automatizados)
 
 ---
 
@@ -101,16 +102,14 @@ Na primeira inicialização, o serviço de autenticação (`auth-service`) cria 
 - Busca rápida por placa ou modelo diretamente na tabela operacional.
 
 ### 4.2. Entrada de Veículos e Ticket em PDF
-- Validação de placas no padrão brasileiro antigo (`ABC-1234`) e Mercosul (`ABC1D23`).
+- Validação de placas no padrão brasileiro antigo (`ABC1234` ou `ABC-1234`) e Mercosul (`ABC1D23`), feita também no back-end: chamadas diretas à API com placa inválida recebem `400`.
+- **Tipo de Veículo:** O operador informa se o veículo é **carro** ou **moto**, pela mesma entrada. O estacionamento **não recebe caminhões** (a entrada é recusada).
 - **Identificação Automática de Mensalistas:** Ao digitar a placa, o sistema consulta o serviço de mensalistas e sinaliza se o veículo possui contrato ativo (isento de cobrança avulsa).
-- **Compatibilidade Inteligente de Vagas:** Filtra e sugere apenas vagas livres compatíveis com o porte do veículo:
-  - **Moto:** Pode estacionar em vagas de Moto, Carro ou Caminhão.
-  - **Carro:** Pode estacionar em vagas de Carro ou Caminhão.
-  - **Caminhão:** Exclusivo para vagas de Caminhão.
 - **Emissão de Comprovante de Entrada (PDF):** Gera ticket formatado em PDF com número de controle, placa, vaga alocada, data/hora de entrada e identificação visual MY Parking.
 
 ### 4.3. Saída de Veículos, Checkout Real e Controle de Cancela
-- **Cálculo Automático de Tarifa:** Tarifa base para a 1ª hora (`R$ 10,00`) + adicional por hora ou fração excedente (`R$ 5,00/h`), aplicando multiplicador conforme o porte do veículo (`1.0x` Carro, `0.5x` Moto, `2.0x` Caminhão).
+- **Cálculo Automático de Tarifa:** Tarifa base para a 1ª hora (`R$ 10,00`) + adicional por hora ou fração excedente (`R$ 5,00/h`), aplicando multiplicador conforme o porte do veículo (`1.0x` Carro, `0.5x` Moto). Permanência de até **10 minutos** é carência, sem cobrança. Exemplos: carro 60 min = R$ 10,00; carro 61 min = R$ 15,00; moto 61 min = R$ 7,50.
+- **Valor Calculado Só no Servidor:** O `pagamento-service` busca a movimentação no `estacionamento-service` (horário de entrada e tipo de veículo) e calcula o valor devido. Valor e permanência enviados pelo cliente são ignorados.
 - **Terminal de Pagamento Integrado:**
   - **PIX (QR Code Dinâmico + Copia e Cola):** Gera payload EMVCo BR Code válido e renderiza o QR Code SVG na tela com status `PENDENTE`. A cancela só é liberada após a confirmação de recebimento (`CONFIRMADO`), gerando identificador fim-a-fim (`E2E ID`).
   - **Cartão de Crédito / Débito (TEF):** Validação algorítmica de numeração de cartão, identificação automática da bandeira (Visa, Mastercard, Elo, Amex, Hipercard), seleção de modalidade (Crédito à vista, parcelado ou Débito) e emissão de código **NSU** e **Código de Autorização**.
@@ -574,3 +573,53 @@ Como cada microsserviço utiliza SQLite local, caso queira limpar todos os regis
 1. Pare o servidor (`Ctrl + C`).
 2. Apague os arquivos `database_*.sqlite` dentro de `services/*/`.
 3. Inicie novamente com `npm start` (as tabelas e o usuário `admin` serão recriados automaticamente).
+
+---
+
+## 13. Testes Automatizados
+
+O projeto tem duas camadas de testes, criadas a partir da consultoria de qualidade feita na N3 da disciplina de Qualidade de Software. Cada teste indica no nome o caso de teste (CT-XX) do relatório que ele cobre.
+
+### 13.1. Testes de unidade, integração e API (Jest + Supertest)
+
+```bash
+npm install   # na raiz, uma vez: instala Jest e Supertest
+npm test
+```
+
+Não é preciso subir o sistema: os testes usam SQLite em memória e não tocam nos arquivos `database_*.sqlite`.
+
+| Arquivo | O que verifica |
+| :--- | :--- |
+| `services/estacionamento-service/tests/ValidadorPlaca.test.js` | Placas válidas e inválidas (CT-04) |
+| `services/estacionamento-service/tests/EstacionamentoService.test.js` | Entrada (CT-01 a CT-04), carro/moto/caminhão, mensalista, trava da cancela (CT-09, CT-12) e carência |
+| `services/estacionamento-service/tests/api.test.js` | Rotas HTTP de entrada, busca por id e saída |
+| `services/pagamento-service/tests/TarifaPorPorte.test.js` | Tarifa de carro e moto nos valores de limite (CT-05, CT-11) e entradas inválidas (CT-06) |
+| `services/pagamento-service/tests/PagamentoService.test.js` | Valor calculado no servidor, troco (CT-07, CT-08), valor adulterado (CT-10) e PIX pendente (CT-12) |
+| `services/pagamento-service/tests/api.test.js` | Rotas HTTP de cálculo e pagamento |
+| `services/mensalista-service/tests/MensalistaService.test.js` | Validação de CPF e placa duplicada |
+| `tests/persistencia.test.js` | Dados continuam gravados depois de reabrir o banco, nos 5 serviços (CT-13) |
+
+### 13.2. Teste ponta a ponta (sistema rodando)
+
+Executa o fluxo completo pelo API Gateway, como o front-end faz:
+
+```bash
+npm start                                         # em um terminal
+npm run test:e2e                                  # em outro: casos CT-01 a CT-12
+# pare o sistema (Ctrl + C), rode npm start de novo e então:
+node tests/e2e/fluxo-completo.js --apos-reinicio  # CT-13: os dados sobreviveram ao reinício
+```
+
+Os casos de saída e pagamento (CT-07 a CT-10) usam o veículo de exemplo `ABC1D23`, que o sistema cria com entrada antiga quando os bancos são novos. Para repetir esses casos, apague os arquivos `database_*.sqlite` antes de `npm start`.
+
+### 13.3. Correções feitas a partir da N3
+
+| Bug | Problema | Correção |
+| :--- | :--- | :--- |
+| BUG-01 (Crítico) | O pagamento aceitava o valor enviado na requisição: um carro com 47 min saiu pagando R$ 0,01 | O valor é calculado só no `pagamento-service`, com a movimentação buscada no `estacionamento-service`; PIX sempre nasce `PENDENTE` |
+| BUG-02 (Alto) | Tarifa de R$ 8,00/h, diferente da prometida, e sem diferença entre carro e moto | Tarifa por porte (R$ 10,00 + R$ 5,00/h, moto 0,5×); a entrada registra o tipo de veículo |
+| BUG-03 (Médio) | Permanência negativa ou em texto virava R$ 0,00 | Recusada com `400` |
+| BUG-04 (Médio) | O back-end aceitava qualquer placa | Validação dos padrões antigo e Mercosul no back-end |
+| BUG-05 (Crítico) | Todos os dados sumiam ao reiniciar (repositórios em memória) | Os 5 serviços gravam em SQLite via Sequelize |
+| — | CPF com 10 ou 12 dígitos era aceito sem validação | Qualquer CPF inválido é recusado |

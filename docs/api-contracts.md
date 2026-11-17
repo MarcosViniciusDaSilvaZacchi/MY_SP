@@ -128,24 +128,33 @@
 ## Pagamentos
 
 ### POST /api/pagamentos/calcular
+Tarifa: R$ 10,00 na 1ª hora + R$ 5,00 por hora ou fração excedente; moto paga metade (0,5×); até 10 min é carência.
+A permanência e o tipo de veículo vêm da movimentação guardada no `estacionamento-service`.
+
 **Request:**
 ```json
 { "movimentacaoId": "uuid" }
 ```
-**Response 200:**
+**Response 200 (carro, 150 min = 1ª hora + 2 frações):**
 ```json
-{ "permanenciaMinutos": 150, "valorCalculado": 25.00, "dentroCarencia": false }
+{ "permanenciaMinutos": 150, "tipoVeiculo": "CARRO", "valorCalculado": 20.00, "dentroCarencia": false }
 ```
+Sem `movimentacaoId`, faz uma simulação com `{ "permanenciaMinutos": 61, "tipoVeiculo": "MOTO" }` (→ R$ 7,50).
+**Errors:** `400` permanência negativa ou não numérica | `404` movimentação não encontrada | `503` estacionamento-service indisponível
 
 ### POST /api/pagamentos
+O valor devido é calculado no servidor; `valor` e `permanenciaMinutos` enviados no corpo são ignorados.
+`valorPago` só é usado no dinheiro (valor recebido no caixa, para o troco). PIX sempre nasce `PENDENTE`.
+
 **Request:**
 ```json
 { "movimentacaoId": "uuid", "forma": "DINHEIRO|CARTAO|PIX", "valorPago": 25.00 }
 ```
-**Response 201:**
+**Response 201 (dinheiro, devido R$ 20,00):**
 ```json
-{ "id": "uuid", "status": "CONFIRMADO", "troco": 0.00 }
+{ "id": "uuid", "status": "CONFIRMADO", "valorCalculado": 20.00, "troco": 5.00 }
 ```
+**Errors:** `400` valor em dinheiro insuficiente | `404` movimentação não encontrada | `409` movimentação já encerrada
 
 ---
 

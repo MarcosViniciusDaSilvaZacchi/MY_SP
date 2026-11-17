@@ -130,5 +130,6 @@ async function aposReinicio() {
   else await casosPrincipais();
   const falhas = resultados.filter((r) => !r.passou).length;
   console.log(`\n${resultados.length - falhas} de ${resultados.length} verificações passaram.`);
-  process.exit(falhas ? 1 : 0);
-})().catch((e) => { console.error(e.message); process.exit(1); });
+  // exitCode em vez de process.exit(): no Windows o Node aborta se as conexões HTTP ainda estiverem fechando
+  process.exitCode = falhas ? 1 : 0;
+})().catch((e) => { console.error(e.message); process.exitCode = 1; });
