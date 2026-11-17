@@ -82,6 +82,15 @@ O `config.h` está no `.gitignore` para a senha do Wi-Fi não ir para o GitHub.
 
 O sketch `iot/esp32-teste-local/esp32-teste-local.ino` usa os mesmos pinos e funciona sozinho: abre a cancela para qualquer carro que pare na frente de um sensor e conta 5 vagas no próprio ESP32. Serve para conferir sensores, servo e divisor de tensão **antes** de ligar o sistema. Para a demonstração com o MY Parking, grave o `esp32-cancela`.
 
+### Gravando com o PlatformIO (VS Code, sem precisar de administrador)
+
+1. Instale a extensão **PlatformIO IDE** no VS Code.
+2. Copie `iot/esp32-cancela/config.example.h` para `config.h` e preencha.
+3. PlatformIO → *Open Project* → escolha a pasta **`iot`** (onde está o `platformio.ini`).
+4. Clique em **Build** (✓) e depois em **Upload** (→), com o ESP32 no USB. **Serial Monitor** (tomada) abre o monitor a 115200.
+
+As bibliotecas são baixadas sozinhas. Se o upload não começar, segure o botão **BOOT** do ESP32 quando aparecer "Connecting...".
+
 ## 4. Sem hardware: simulador
 
 Com o sistema rodando (`npm start`), em outro terminal:
