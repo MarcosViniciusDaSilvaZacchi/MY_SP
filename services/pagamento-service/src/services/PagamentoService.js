@@ -1,57 +1,83 @@
 // ──────────────────────────────────────────────────────────────────
 // PagamentoService (Application Service / Use Case - SRP & DIP)
 // Responsabilidade: orquestrar o cálculo, processamento, confirmação e persistência de pagamentos
+//
+// Regra de segurança: o valor devido é SEMPRE calculado aqui, a partir da
+// movimentação guardada no estacionamento-service (horário de entrada e tipo
+// de veículo). Valor e permanência enviados pelo cliente são ignorados.
 // ──────────────────────────────────────────────────────────────────
 
 const { Pagamento } = require('../domain/entities/PagamentoEntities');
+const { FormaPagamento } = require('../domain/enums/PagamentoEnums');
 const { PagamentoProcessorFactory } = require('../domain/strategies/PaymentProcessors');
+
+function erro(mensagem, statusCode) {
+  const err = new Error(mensagem);
+  err.statusCode = statusCode;
+  return err;
+}
 
 class PagamentoService {
   /**
    * @param {import('../repositories/PagamentoRepository').IPagamentoRepository} pagamentoRepository
    * @param {import('../domain/strategies/TarifaStrategy').TarifaEngine} tarifaEngine
+   * @param {import('../clients/EstacionamentoClient').IEstacionamentoClient} estacionamentoClient
    */
-  constructor(pagamentoRepository, tarifaEngine) {
+  constructor(pagamentoRepository, tarifaEngine, estacionamentoClient) {
     this.pagamentoRepository = pagamentoRepository;
     this.tarifaEngine = tarifaEngine;
+    this.estacionamentoClient = estacionamentoClient;
   }
 
-  async calcularTarifa({ movimentacaoId, permanenciaMinutos, minutos }) {
-    const min = permanenciaMinutos !== undefined ? permanenciaMinutos : minutos;
-    if (min === undefined || min === null) {
-      const err = new Error('permanenciaMinutos obrigatorio');
-      err.statusCode = 400;
-      throw err;
+  async _obterMovimentacao(movimentacaoId) {
+    const mov = await this.estacionamentoClient.buscarMovimentacao(movimentacaoId);
+    if (!mov) throw erro('Movimentação não encontrada', 404);
+    return mov;
+  }
+
+  _calcular(mov) {
+    if (mov.tipo === 'MENSALISTA') {
+      return { valorCalculado: 0, dentroCarencia: false, isentoMensalista: true, tabelaAplicada: { descricao: 'Mensalista (isento)' } };
+    }
+    return { ...this.tarifaEngine.calcular(mov.permanenciaMinutos, mov.tipoVeiculo), isentoMensalista: false };
+  }
+
+  /**
+   * Com movimentacaoId: calcula com os dados reais da movimentação.
+   * Sem movimentacaoId: simulação a partir de permanenciaMinutos (validada) e tipoVeiculo.
+   */
+  async calcularTarifa({ movimentacaoId, permanenciaMinutos, minutos, tipoVeiculo }) {
+    if (movimentacaoId) {
+      const mov = await this._obterMovimentacao(movimentacaoId);
+      const calculo = this._calcular(mov);
+      return {
+        movimentacaoId: String(movimentacaoId),
+        permanenciaMinutos: mov.permanenciaMinutos,
+        minutos: mov.permanenciaMinutos,
+        tipoVeiculo: mov.tipoVeiculo,
+        ...calculo,
+        valor: calculo.valorCalculado,
+      };
     }
 
-    const minutosNum = Number(min);
-    const { valorCalculado, dentroCarencia, tabelaAplicada } = this.tarifaEngine.calcular(minutosNum);
-
+    const min = permanenciaMinutos !== undefined ? permanenciaMinutos : minutos;
+    if (min === undefined) {
+      throw erro('Informe movimentacaoId ou permanenciaMinutos', 400);
+    }
+    const calculo = this.tarifaEngine.calcular(min, tipoVeiculo || 'CARRO'); // valida a permanência (400 se inválida)
     return {
-      movimentacaoId,
-      permanenciaMinutos: minutosNum,
-      minutos: minutosNum,
-      dentroCarencia,
-      valorCalculado,
-      valor: valorCalculado,
-      tabelaAplicada,
+      movimentacaoId: null,
+      permanenciaMinutos: Number(min),
+      minutos: Number(min),
+      tipoVeiculo: String(tipoVeiculo || 'CARRO').toUpperCase(),
+      ...calculo,
+      valor: calculo.valorCalculado,
     };
   }
 
-  async registrarPagamento({
-    movimentacaoId,
-    forma,
-    valorPago,
-    valor,
-    permanenciaMinutos,
-    minutos,
-    cartao,
-    iniciarPix,
-  }) {
+  async registrarPagamento({ movimentacaoId, forma, valorPago, cartao }) {
     if (!movimentacaoId || !forma) {
-      const err = new Error('movimentacaoId e forma sao obrigatorios');
-      err.statusCode = 400;
-      throw err;
+      throw erro('movimentacaoId e forma sao obrigatorios', 400);
     }
 
     // Verifica se já existe pagamento CONFIRMADO para esta movimentação (Idempotência)
@@ -60,28 +86,37 @@ class PagamentoService {
       return existente.toJSON();
     }
 
-    const min = permanenciaMinutos !== undefined ? permanenciaMinutos : (minutos || 0);
-    const { valorCalculado: valorMotor } = this.tarifaEngine.calcular(Number(min));
-    const valorDevido = valorMotor > 0 ? valorMotor : (valor !== undefined ? Number(valor) : 0);
-    const vPago = valorPago !== undefined ? Number(valorPago) : (valor !== undefined ? Number(valor) : valorDevido);
+    const mov = await this._obterMovimentacao(movimentacaoId);
+    if (mov.status !== 'ABERTA') {
+      throw erro('Esta movimentação já foi encerrada.', 409);
+    }
+    if (mov.tipo === 'MENSALISTA') {
+      throw erro('Mensalista com contrato ativo não paga estadia avulsa.', 400);
+    }
+
+    const { valorCalculado: valorDevido } = this.tarifaEngine.calcular(mov.permanenciaMinutos, mov.tipoVeiculo);
+    const formaNorm = String(forma).toUpperCase().trim();
+
+    // Só no dinheiro o valor recebido vem do caixa; no cartão e no PIX é o próprio valor devido
+    const vPago = formaNorm === FormaPagamento.DINHEIRO ? Number(valorPago) : valorDevido;
 
     // Usa Strategy para processar a forma de pagamento selecionada
-    const processor = PagamentoProcessorFactory.obterProcessador(forma);
-    const resultadoProc = await processor.processar(valorDevido, vPago, {
-      movimentacaoId,
-      cartao,
-      iniciarPix: Boolean(iniciarPix),
-    });
+    const processor = PagamentoProcessorFactory.obterProcessador(formaNorm);
+    const resultadoProc = await processor.processar(valorDevido, vPago, { movimentacaoId, cartao });
 
     const pagamento = new Pagamento({
       id: String(Date.now()),
       movimentacaoId,
-      forma: String(forma).toUpperCase().trim(),
+      forma: formaNorm,
       valorCalculado: valorDevido,
       valorPago: vPago,
       troco: resultadoProc.troco,
       status: resultadoProc.status,
-      detalhes: resultadoProc.detalhes || {},
+      detalhes: {
+        ...(resultadoProc.detalhes || {}),
+        permanenciaMinutos: mov.permanenciaMinutos,
+        tipoVeiculo: mov.tipoVeiculo,
+      },
       dataHora: new Date().toISOString(),
     });
 
@@ -94,9 +129,7 @@ class PagamentoService {
   async confirmarPagamento(id) {
     const pagamento = await this.pagamentoRepository.buscarPorId(id);
     if (!pagamento) {
-      const err = new Error('Pagamento não encontrado');
-      err.statusCode = 404;
-      throw err;
+      throw erro('Pagamento não encontrado', 404);
     }
 
     if (pagamento.status === 'CONFIRMADO') {
@@ -115,9 +148,7 @@ class PagamentoService {
   async buscarPorId(id) {
     const pagamento = await this.pagamentoRepository.buscarPorId(id);
     if (!pagamento) {
-      const err = new Error('Pagamento não encontrado');
-      err.statusCode = 404;
-      throw err;
+      throw erro('Pagamento não encontrado', 404);
     }
     return pagamento.toJSON();
   }
@@ -125,9 +156,7 @@ class PagamentoService {
   async buscarPorMovimentacaoId(movimentacaoId) {
     const pagamento = await this.pagamentoRepository.buscarPorMovimentacaoId(movimentacaoId);
     if (!pagamento) {
-      const err = new Error('Nenhum pagamento encontrado para esta movimentação');
-      err.statusCode = 404;
-      throw err;
+      throw erro('Nenhum pagamento encontrado para esta movimentação', 404);
     }
     return pagamento.toJSON();
   }

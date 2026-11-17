@@ -10,7 +10,7 @@ const SERVICE_NAME = 'mensalista-service';
 
 app.use(cors());
 app.use(express.json());
-app.use(morgan('dev'));
+app.use(morgan('dev', { skip: () => process.env.NODE_ENV === 'test' }));
 
 app.use('/', routes);
 
@@ -20,6 +20,8 @@ app.get('/health', (req, res) => {
 
 app.use((req, res) => res.status(404).json({ error: 'Rota nao encontrada' }));
 
-app.listen(PORT, () => console.log(`[${SERVICE_NAME}] Rodando na porta ${PORT}`));
-
+// Só sobe o servidor quando executado direto (node src/app.js); nos testes o app é importado
+if (require.main === module) {
+  app.listen(PORT, () => console.log(`[${SERVICE_NAME}] Rodando na porta ${PORT}`));
+}
 module.exports = app;

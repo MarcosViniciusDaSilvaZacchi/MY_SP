@@ -132,13 +132,77 @@ class TarifaNoturnaStrategy extends ITarifaStrategy {
 }
 
 /**
+ * Tarifa por Porte (regra oficial, README §4.3):
+ * R$ 10,00 pela 1ª hora + R$ 5,00 por hora ou fração excedente,
+ * multiplicado pelo porte do veículo (carro 1,0×, moto 0,5×).
+ * Permanência de até 10 minutos é carência (RN-06): não há cobrança.
+ * O estacionamento não recebe caminhões.
+ */
+class TarifaPorPorteStrategy extends ITarifaStrategy {
+  constructor({
+    carenciaMinutos = 10,
+    valorPrimeiraHora = 10.0,
+    valorHoraAdicional = 5.0,
+    multiplicadores = { CARRO: 1.0, MOTO: 0.5 },
+  } = {}) {
+    super();
+    this.carenciaMinutos = carenciaMinutos;
+    this.valorPrimeiraHora = valorPrimeiraHora;
+    this.valorHoraAdicional = valorHoraAdicional;
+    this.multiplicadores = multiplicadores;
+  }
+
+  calcular(permanenciaMinutos, tipoVeiculo = 'CARRO') {
+    const min = Number(permanenciaMinutos);
+    if (typeof permanenciaMinutos === 'boolean' || permanenciaMinutos === '' || permanenciaMinutos === null
+      || !Number.isFinite(min) || min < 0) {
+      const err = new Error('Permanência inválida: informe um número de minutos maior ou igual a zero.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const tipo = String(tipoVeiculo || 'CARRO').toUpperCase().trim();
+    const multiplicador = this.multiplicadores[tipo];
+    if (multiplicador === undefined) {
+      const err = new Error(tipo === 'CAMINHAO'
+        ? 'Caminhões não são aceitos neste estacionamento.'
+        : 'Tipo de veículo inválido. Use CARRO ou MOTO.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const tabelaAplicada = {
+      id: 'PORTE_V2',
+      descricao: 'Tarifa por porte',
+      valorPrimeiraHora: this.valorPrimeiraHora,
+      valorHoraAdicional: this.valorHoraAdicional,
+      carenciaMinutos: this.carenciaMinutos,
+      tipoVeiculo: tipo,
+      multiplicador,
+    };
+
+    if (min <= this.carenciaMinutos) {
+      return { valorCalculado: 0.0, dentroCarencia: true, tabelaAplicada };
+    }
+
+    const horas = Math.max(1, Math.ceil(min / 60));
+    const valorBase = this.valorPrimeiraHora + (horas - 1) * this.valorHoraAdicional;
+    return {
+      valorCalculado: parseFloat((valorBase * multiplicador).toFixed(2)),
+      dentroCarencia: false,
+      tabelaAplicada,
+    };
+  }
+}
+
+/**
  * TarifaEngine (Contexto do Strategy Pattern)
  */
 class TarifaEngine {
   /**
    * @param {ITarifaStrategy} defaultStrategy
    */
-  constructor(defaultStrategy = new TarifaPadraoStrategy()) {
+  constructor(defaultStrategy = new TarifaPorPorteStrategy()) {
     this.strategy = defaultStrategy;
   }
 
@@ -146,8 +210,8 @@ class TarifaEngine {
     this.strategy = strategy;
   }
 
-  calcular(permanenciaMinutos) {
-    return this.strategy.calcular(permanenciaMinutos);
+  calcular(permanenciaMinutos, tipoVeiculo) {
+    return this.strategy.calcular(permanenciaMinutos, tipoVeiculo);
   }
 }
 
@@ -156,5 +220,6 @@ module.exports = {
   TarifaPadraoStrategy,
   TarifaDiferenciadaStrategy,
   TarifaNoturnaStrategy,
+  TarifaPorPorteStrategy,
   TarifaEngine,
 };

@@ -3,13 +3,14 @@
 // Encapsula o ciclo de vida do veículo dentro do estacionamento
 // ──────────────────────────────────────────────────────────────────
 
-const { TipoMovimentacao, StatusMovimentacao } = require('../enums/EstacionamentoEnums');
+const { TipoMovimentacao, StatusMovimentacao, TipoVeiculo } = require('../enums/EstacionamentoEnums');
 
 class Movimentacao {
   constructor({
     id = String(Date.now()),
     placa,
     tipo = TipoMovimentacao.ROTATIVO,
+    tipoVeiculo = TipoVeiculo.CARRO,
     dataHoraEntrada = new Date().toISOString(),
     horaEntrada,
     dataHoraSaida = null,
@@ -25,6 +26,7 @@ class Movimentacao {
     this.id = String(id);
     this.placa = placa ? placa.toUpperCase().trim() : '';
     this.tipo = tipo;
+    this.tipoVeiculo = String(tipoVeiculo || TipoVeiculo.CARRO).toUpperCase().trim();
     this.dataHoraEntrada = entrada;
     this.horaEntrada = entrada;
     this.dataHoraSaida = dataHoraSaida || horaSaida || null;
@@ -41,6 +43,9 @@ class Movimentacao {
     if (!this.placa) throw new Error('Placa é obrigatória');
     if (!Object.values(TipoMovimentacao).includes(this.tipo)) {
       throw new Error(`Tipo de movimentação inválido: ${this.tipo}`);
+    }
+    if (!Object.values(TipoVeiculo).includes(this.tipoVeiculo)) {
+      throw new Error(`Tipo de veículo inválido: ${this.tipoVeiculo}`);
     }
   }
 
@@ -67,6 +72,7 @@ class Movimentacao {
       movimentacaoId: this.id,
       placa: this.placa,
       tipo: this.tipo,
+      tipoVeiculo: this.tipoVeiculo,
       dataHoraEntrada: this.dataHoraEntrada,
       horaEntrada: this.horaEntrada,
       dataHoraSaida: this.dataHoraSaida,

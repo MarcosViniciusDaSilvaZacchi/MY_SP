@@ -14,7 +14,14 @@ const StatusMovimentacao = Object.freeze({
   CANCELADA: 'CANCELADA',
 });
 
+// O estacionamento recebe apenas carros e motos (caminhão não entra)
+const TipoVeiculo = Object.freeze({
+  CARRO: 'CARRO',
+  MOTO: 'MOTO',
+});
+
 module.exports = {
   TipoMovimentacao,
   StatusMovimentacao,
+  TipoVeiculo,
 };

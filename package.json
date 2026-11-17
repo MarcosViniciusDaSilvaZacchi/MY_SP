@@ -7,7 +7,26 @@
     "start": "node iniciar.js",
     "dev": "node iniciar.js",
     "install:all": "node iniciar.js --install-only",
-    "stop": "powershell -ExecutionPolicy Bypass -File parar.ps1"
+    "stop": "powershell -ExecutionPolicy Bypass -File parar.ps1",
+    "test": "jest",
+    "test:e2e": "node tests/e2e/fluxo-completo.js"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "setupFiles": [
+      "<rootDir>/tests/jest.setup.js"
+    ],
+    "testMatch": [
+      "<rootDir>/services/*/tests/**/*.test.js",
+      "<rootDir>/tests/**/*.test.js"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "<rootDir>/frontend/"
+    ]
   }
 }
-

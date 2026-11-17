@@ -45,6 +45,16 @@ class EstacionamentoController {
     }
   };
 
+  buscarPorId = async (req, res) => {
+    try {
+      const resultado = await this.estacionamentoService.buscarPorId(req.params.id);
+      return res.status(200).json(resultado);
+    } catch (err) {
+      const statusCode = err.statusCode || 500;
+      return res.status(statusCode).json({ error: err.message || 'Erro ao buscar movimentação' });
+    }
+  };
+
   registrarSaida = async (req, res) => {
     try {
       const resultado = await this.estacionamentoService.registrarSaida(req.body);

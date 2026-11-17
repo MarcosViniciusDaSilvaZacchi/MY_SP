@@ -1,5 +1,6 @@
 const express = require('express');
-const { InMemoryUsuarioRepository } = require('../repositories/InMemoryUsuarioRepository');
+const { SqliteUsuarioRepository } = require('../repositories/SqliteUsuarioRepository');
+const { criarConexao } = require('../infra/SqliteDocumentStore');
 const { JwtService, BcryptPasswordHasher } = require('../security/SecurityServices');
 const { AuthService } = require('../services/AuthService');
 const { AuthController } = require('../controllers/authController');
@@ -7,7 +8,8 @@ const { AuthController } = require('../controllers/authController');
 const router = express.Router();
 
 // Composition Root / Injeção de Dependências (DIP)
-const usuarioRepository = new InMemoryUsuarioRepository();
+// Persistência em SQLite (database_auth.sqlite): os dados sobrevivem a reinícios
+const usuarioRepository = new SqliteUsuarioRepository(criarConexao('database_auth.sqlite'));
 const jwtService = new JwtService();
 const passwordHasher = new BcryptPasswordHasher();
 const authService = new AuthService(usuarioRepository, jwtService, passwordHasher);
@@ -23,5 +25,7 @@ router.get('/me', authController.me);
 router.get('/usuarios',        authController.listarUsuarios);
 router.post('/usuarios',       authController.criarUsuario);
 router.delete('/usuarios/:id', authController.removerUsuario);
+
+router.repositorio = usuarioRepository; // usado nos testes para fechar a conexão
 
 module.exports = router;

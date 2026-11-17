@@ -38,6 +38,14 @@
             </span>
           </div>
 
+          <div class="form-group">
+            <label for="tipo-veiculo">Tipo de Veículo</label>
+            <select id="tipo-veiculo" v-model="tipoVeiculo" :disabled="loading" class="select-veiculo">
+              <option value="CARRO">Carro</option>
+              <option value="MOTO">Moto (paga metade da tarifa)</option>
+            </select>
+          </div>
+
           <div v-if="error" class="error-banner" role="alert">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10" />
@@ -251,6 +259,7 @@ import api from '../services/api'
 import { exportarComprovantePDF } from '../utils/exportadores'
 
 const placa = ref('')
+const tipoVeiculo = ref('CARRO')
 const filtroPlaca = ref('')
 const loading = ref(false)
 const error = ref('')
@@ -275,9 +284,10 @@ async function registrar() {
   error.value = ''
 
   try {
-    const res = await api.post('/entradas', { placa: placa.value })
+    const res = await api.post('/entradas', { placa: placa.value, tipoVeiculo: tipoVeiculo.value })
     resultado.value = res.data
     placa.value = ''
+    tipoVeiculo.value = 'CARRO'
     await carregarEntradas()
   } catch (e) {
     error.value = e?.response?.data?.error || e?.response?.data?.message || 'Erro ao registrar entrada.'
@@ -416,6 +426,16 @@ label {
   font-weight: 600;
   color: #334155;
   margin-bottom: 0.45rem;
+}
+
+.select-veiculo {
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: #fff;
+  color: #0f172a;
 }
 
 .plate-input-container {

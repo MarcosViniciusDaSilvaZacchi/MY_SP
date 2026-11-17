@@ -65,6 +65,7 @@ const SERVICOS = [
     color: COLORS.yellow,
     env: {
       PORT: '3004',
+      ESTACIONAMENTO_SERVICE_URL: 'http://localhost:3002',
       PIX_CHAVE: '4654f72d-b238-462d-b863-35d0c67640b6',
       PIX_BENEFICIARIO: 'Yan Carlos Farias',
       PIX_CIDADE: 'SAO PAULO',

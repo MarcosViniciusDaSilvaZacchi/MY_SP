@@ -4,9 +4,19 @@
 // ──────────────────────────────────────────────────────────────────
 
 const { Movimentacao } = require('../domain/entities/Movimentacao');
-const { TipoMovimentacao, StatusMovimentacao } = require('../domain/enums/EstacionamentoEnums');
+const { TipoMovimentacao, StatusMovimentacao, TipoVeiculo } = require('../domain/enums/EstacionamentoEnums');
 const { ResumoEstacionamentoCalculator } = require('../domain/services/ResumoEstacionamentoCalculator');
+const { ValidadorPlaca } = require('../domain/services/ValidadorPlaca');
 const { AvaliadorAcessoContext } = require('../domain/strategies/RegrasAcesso');
+
+// Permanência até este limite é carência: o avulso sai sem pagar
+const CARENCIA_MINUTOS = 10;
+
+function erro(mensagem, statusCode) {
+  const err = new Error(mensagem);
+  err.statusCode = statusCode;
+  return err;
+}
 
 class EstacionamentoService {
   /**
@@ -15,19 +25,22 @@ class EstacionamentoService {
    * @param {import('../clients/PagamentoClient').IPagamentoClient} [pagamentoClient]
    * @param {ResumoEstacionamentoCalculator} [resumoCalculator]
    * @param {AvaliadorAcessoContext} [avaliadorAcesso]
+   * @param {ValidadorPlaca} [validadorPlaca]
    */
   constructor(
     movimentacaoRepository,
     mensalistaClient,
     pagamentoClient = null,
     resumoCalculator = new ResumoEstacionamentoCalculator(),
-    avaliadorAcesso = new AvaliadorAcessoContext()
+    avaliadorAcesso = new AvaliadorAcessoContext(),
+    validadorPlaca = new ValidadorPlaca()
   ) {
     this.movimentacaoRepository = movimentacaoRepository;
     this.mensalistaClient = mensalistaClient;
     this.pagamentoClient = pagamentoClient;
     this.resumoCalculator = resumoCalculator;
     this.avaliadorAcesso = avaliadorAcesso;
+    this.validadorPlaca = validadorPlaca;
   }
 
   async listarEntradas() {
@@ -35,35 +48,42 @@ class EstacionamentoService {
     return lista.map((m) => (typeof m.toJSON === 'function' ? m.toJSON() : m));
   }
 
-  async registrarEntrada({ placa, origem = 'OPERADOR' }) {
-    if (!placa) {
-      const err = new Error('Placa obrigatoria');
-      err.statusCode = 400;
-      throw err;
+  async registrarEntrada({ placa, tipoVeiculo = TipoVeiculo.CARRO, origem = 'OPERADOR' }) {
+    if (!placa || !String(placa).trim()) {
+      throw erro('Placa obrigatoria', 400);
     }
 
-    const placaUpper = placa.toUpperCase().trim();
+    // Validação no back-end: chamadas diretas à API não podem registrar placas inválidas
+    if (!this.validadorPlaca.validar(placa)) {
+      throw erro('Placa inválida. Use o padrão antigo (ABC1234) ou o Mercosul (ABC1D23).', 400);
+    }
+    const placaNorm = this.validadorPlaca.normalizar(placa);
 
-    const aberta = await this.movimentacaoRepository.buscarAbertaPorPlaca(placaUpper);
+    const veiculo = String(tipoVeiculo || TipoVeiculo.CARRO).toUpperCase().trim();
+    if (veiculo === 'CAMINHAO') {
+      throw erro('Caminhões não são aceitos neste estacionamento.', 400);
+    }
+    if (!Object.values(TipoVeiculo).includes(veiculo)) {
+      throw erro('Tipo de veículo inválido. Use CARRO ou MOTO.', 400);
+    }
+
+    const aberta = await this.movimentacaoRepository.buscarAbertaPorPlaca(placaNorm);
     if (aberta) {
-      const err = new Error('Veiculo ja possui entrada aberta');
-      err.statusCode = 409;
-      throw err;
+      throw erro('Veiculo ja possui entrada aberta', 409);
     }
 
     // Consulta mensalista via adapter/client desacoplado (DIP & ISP)
-    const mensalista = await this.mensalistaClient.verificarMensalistaPorPlaca(placaUpper);
+    const mensalista = await this.mensalistaClient.verificarMensalistaPorPlaca(placaNorm);
 
     // Avaliação de permissão de acesso delegada ao Strategy Pattern (OCP & SRP)
     const avaliacao = this.avaliadorAcesso.avaliar({
-      placa: placaUpper,
+      placa: placaNorm,
       mensalista,
       origem,
     });
 
     if (!avaliacao.autorizado) {
-      const err = new Error(`Acesso negado: ${avaliacao.motivoNegacao || 'veículo não autorizado'}`);
-      err.statusCode = 403;
+      const err = erro(`Acesso negado: ${avaliacao.motivoNegacao || 'veículo não autorizado'}`, 403);
       err.detalhes = { status: mensalista?.status, motivo: avaliacao.motivoNegacao };
       throw err;
     }
@@ -71,8 +91,9 @@ class EstacionamentoService {
     const agoraIso = new Date().toISOString();
     const movimentacao = new Movimentacao({
       id: String(Date.now()),
-      placa: placaUpper,
+      placa: placaNorm,
       tipo: avaliacao.tipo,
+      tipoVeiculo: veiculo,
       dataHoraEntrada: agoraIso,
       horaEntrada: agoraIso,
       status: StatusMovimentacao.ABERTA,
@@ -89,17 +110,13 @@ class EstacionamentoService {
 
   async buscarAberta(placa) {
     if (!placa) {
-      const err = new Error('Placa obrigatoria');
-      err.statusCode = 400;
-      throw err;
+      throw erro('Placa obrigatoria', 400);
     }
 
-    const placaUpper = placa.toUpperCase().trim();
-    const mov = await this.movimentacaoRepository.buscarAbertaPorPlaca(placaUpper);
+    const placaNorm = this.validadorPlaca.normalizar(placa);
+    const mov = await this.movimentacaoRepository.buscarAbertaPorPlaca(placaNorm);
     if (!mov) {
-      const err = new Error('Nenhuma entrada aberta para essa placa');
-      err.statusCode = 404;
-      throw err;
+      throw erro('Nenhuma entrada aberta para essa placa', 404);
     }
 
     const permanenciaMinutos = mov.calcularPermanenciaMinutos(new Date());
@@ -111,11 +128,27 @@ class EstacionamentoService {
     };
   }
 
+  /**
+   * Busca uma movimentação pelo id. Usado pelo pagamento-service para calcular
+   * a tarifa a partir do horário de entrada guardado aqui, e não de valores
+   * enviados pelo cliente.
+   */
+  async buscarPorId(id) {
+    if (!id) {
+      throw erro('Id da movimentação obrigatório', 400);
+    }
+    const mov = await this.movimentacaoRepository.buscarPorId(id);
+    if (!mov) {
+      throw erro('Movimentação não encontrada', 404);
+    }
+    const aberta = mov.status === StatusMovimentacao.ABERTA;
+    const permanenciaMinutos = aberta ? mov.calcularPermanenciaMinutos(new Date()) : mov.permanenciaMinutos;
+    return { ...mov.toJSON(), permanenciaMinutos, minutos: permanenciaMinutos };
+  }
+
   async registrarSaida({ placa, movimentacaoId, valorCobrado }) {
     if (!placa && !movimentacaoId) {
-      const err = new Error('Placa ou movimentacaoId obrigatorio');
-      err.statusCode = 400;
-      throw err;
+      throw erro('Placa ou movimentacaoId obrigatorio', 400);
     }
 
     let mov = null;
@@ -123,33 +156,32 @@ class EstacionamentoService {
       mov = await this.movimentacaoRepository.buscarAbertaPorId(movimentacaoId);
     }
     if (!mov && placa) {
-      mov = await this.movimentacaoRepository.buscarAbertaPorPlaca(placa);
+      mov = await this.movimentacaoRepository.buscarAbertaPorPlaca(this.validadorPlaca.normalizar(placa));
     }
 
     if (!mov) {
-      const err = new Error('Entrada aberta nao encontrada para essa placa');
-      err.statusCode = 404;
-      throw err;
+      throw erro('Entrada aberta nao encontrada para essa placa', 404);
     }
 
     const agoraIso = new Date().toISOString();
     const permanenciaMinutos = mov.calcularPermanenciaMinutos(agoraIso);
-    const exigePagamento = mov.tipo === TipoMovimentacao.ROTATIVO && permanenciaMinutos > 10;
+    const exigePagamento = mov.tipo === TipoMovimentacao.ROTATIVO && permanenciaMinutos > CARENCIA_MINUTOS;
 
-    let valorFinal = valorCobrado;
+    // Mensalista ou avulso dentro da carência: não há cobrança
+    let valorFinal = exigePagamento ? valorCobrado : 0;
 
     if (exigePagamento && this.pagamentoClient) {
       const pagMov = await this.pagamentoClient.buscarPagamentoPorMovimentacao(mov.id);
       if (!pagMov || pagMov.status !== 'CONFIRMADO') {
-        const err = new Error(
+        throw erro(
           pagMov?.status === 'PENDENTE'
             ? 'Para liberar a saída, confirme primeiro o recebimento do pagamento PIX.'
-            : 'Para liberar a cancela, conclua primeiro o pagamento do estacionamento.'
+            : 'Para liberar a cancela, conclua primeiro o pagamento do estacionamento.',
+          402
         );
-        err.statusCode = 402;
-        throw err;
       }
-      valorFinal = Number(pagMov.valorCalculado ?? pagMov.valor ?? valorFinal ?? 0);
+      // O valor registrado é o calculado pelo pagamento-service, nunca o enviado pelo cliente
+      valorFinal = Number(pagMov.valorCalculado ?? pagMov.valor ?? 0);
     }
 
     mov.finalizar(agoraIso, valorFinal !== undefined ? valorFinal : 0);
@@ -174,4 +206,4 @@ class EstacionamentoService {
   }
 }
 
-module.exports = { EstacionamentoService };
+module.exports = { EstacionamentoService, CARENCIA_MINUTOS };

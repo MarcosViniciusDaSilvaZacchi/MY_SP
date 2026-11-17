@@ -266,35 +266,20 @@ class PixProcessor extends IPagamentoProcessor {
     });
     const qrCodeSvg = await PixPayloadGenerator.gerarQrCodeSvg(pixCopiaECola);
 
-    // Se iniciarPix = true, cria a cobrança PIX como PENDENTE aguardando confirmação (Webhook / Banco)
-    if (opcoes.iniciarPix) {
-      return {
-        status: StatusPagamento.PENDENTE,
-        troco: 0,
-        detalhes: {
-          tipo: FormaPagamento.PIX,
-          txId,
-          chavePix,
-          beneficiario,
-          instituicao: 'PIX BANCO CENTRAL (SPI)',
-          pixCopiaECola,
-          qrCodeSvg,
-          expiraEm: new Date(Date.now() + 15 * 60000).toISOString(),
-        },
-      };
-    }
-
+    // A cobrança PIX sempre nasce PENDENTE: só vira CONFIRMADO pela confirmação do recebimento
+    // (POST /pagamentos/:id/confirmar). Antes, uma chamada sem "iniciarPix" já saía confirmada.
     return {
-      status: StatusPagamento.CONFIRMADO,
+      status: StatusPagamento.PENDENTE,
       troco: 0,
       detalhes: {
         tipo: FormaPagamento.PIX,
         txId,
         chavePix,
         beneficiario,
+        instituicao: 'PIX BANCO CENTRAL (SPI)',
         pixCopiaECola,
         qrCodeSvg,
-        endToEndId: `E18236120${Date.now()}PIX`,
+        expiraEm: new Date(Date.now() + 15 * 60000).toISOString(),
       },
     };
   }

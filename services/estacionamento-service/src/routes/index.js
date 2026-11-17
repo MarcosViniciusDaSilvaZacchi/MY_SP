@@ -1,5 +1,6 @@
 const express = require('express');
-const { InMemoryMovimentacaoRepository } = require('../repositories/InMemoryMovimentacaoRepository');
+const { SqliteMovimentacaoRepository } = require('../repositories/SqliteMovimentacaoRepository');
+const { criarConexao } = require('../infra/SqliteDocumentStore');
 const { MensalistaHttpClient } = require('../clients/MensalistaClient');
 const { PagamentoHttpClient } = require('../clients/PagamentoClient');
 const { ResumoEstacionamentoCalculator } = require('../domain/services/ResumoEstacionamentoCalculator');
@@ -10,7 +11,8 @@ const { EstacionamentoController } = require('../controllers/estacionamentoContr
 const router = express.Router();
 
 // Composition Root / Injeção de Dependências (DIP)
-const movimentacaoRepository = new InMemoryMovimentacaoRepository();
+// Persistência em SQLite (database_estacionamento.sqlite): os dados sobrevivem a reinícios
+const movimentacaoRepository = new SqliteMovimentacaoRepository(criarConexao('database_estacionamento.sqlite'));
 const mensalistaClient = new MensalistaHttpClient();
 const pagamentoClient = new PagamentoHttpClient();
 const resumoCalculator = new ResumoEstacionamentoCalculator(20);
@@ -28,7 +30,10 @@ const estacionamentoController = new EstacionamentoController(estacionamentoServ
 router.get('/entradas',              estacionamentoController.listarEntradas);
 router.post('/entradas',             estacionamentoController.registrarEntrada);
 router.get('/movimentacoes/aberta',  estacionamentoController.buscarAberta);
+router.get('/movimentacoes/:id',     estacionamentoController.buscarPorId);
 router.post('/saidas',               estacionamentoController.registrarSaida);
 router.get('/relatorios/resumo',     estacionamentoController.resumo);
+
+router.repositorio = movimentacaoRepository; // usado nos testes para fechar a conexão
 
 module.exports = router;

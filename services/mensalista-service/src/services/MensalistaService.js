@@ -47,8 +47,9 @@ class MensalistaService {
     }
 
     // Validação de integridade do CPF delegada ao serviço especializado (SRP & DIP)
+    // Qualquer CPF que não tenha 11 dígitos válidos é recusado (antes, 10 ou 12 dígitos passavam sem validação)
     const cpfLimpo = String(cpf).replace(/\D/g, '');
-    if (cpfLimpo.length === 11 && !this.validadorCpf.validar(cpfLimpo)) {
+    if (!this.validadorCpf.validar(cpfLimpo)) {
       const err = new Error('CPF fornecido é inválido');
       err.statusCode = 400;
       throw err;

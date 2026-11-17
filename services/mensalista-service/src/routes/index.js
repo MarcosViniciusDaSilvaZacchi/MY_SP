@@ -1,5 +1,6 @@
 const express = require('express');
-const { InMemoryMensalistaRepository } = require('../repositories/InMemoryMensalistaRepository');
+const { SqliteMensalistaRepository } = require('../repositories/SqliteMensalistaRepository');
+const { criarConexao } = require('../infra/SqliteDocumentStore');
 const { ValidadorCpf } = require('../domain/services/ValidadorCpf');
 const { MensalistaService } = require('../services/MensalistaService');
 const { MensalistaController } = require('../controllers/mensalistaController');
@@ -7,7 +8,8 @@ const { MensalistaController } = require('../controllers/mensalistaController');
 const router = express.Router();
 
 // Composition Root / Injeção de Dependências (DIP)
-const mensalistaRepository = new InMemoryMensalistaRepository();
+// Persistência em SQLite (database_mensalista.sqlite): os dados sobrevivem a reinícios
+const mensalistaRepository = new SqliteMensalistaRepository(criarConexao('database_mensalista.sqlite'));
 const validadorCpf = new ValidadorCpf();
 const mensalistaService = new MensalistaService(mensalistaRepository, validadorCpf);
 const mensalistaController = new MensalistaController(mensalistaService);
@@ -16,5 +18,7 @@ router.get('/mensalistas',              mensalistaController.listar);
 router.post('/mensalistas',             mensalistaController.cadastrar);
 router.get('/mensalistas/placa/:placa', mensalistaController.buscarPorPlaca);
 router.patch('/mensalistas/:id',        mensalistaController.atualizar);
+
+router.repositorio = mensalistaRepository; // usado nos testes para fechar a conexão
 
 module.exports = router;
