@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ligação da cancela ESP32</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,600&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: bancada de laboratório, clara e precisa, sem enfeite
+   IDEA: folha de montagem estilo Fritzing presa ao lado da protoboard
+   PICTURE: a vista de protoboard em escala, fios numerados, detalhes ampliados
+   COLOUR and TYPE: papel branco, tinta grafite; as cores dos fios são o único acento; Literata + Plex Condensed
+   LAYOUT: título curto, desenho grande, detalhes lado a lado, checklist, esquema */
+:root{color-scheme:light dark;--bg:light-dark(#eef0f2,#14171c);--ink:light-dark(#10131a,#e8eaee);--mut:light-dark(#555b66,#a3a9b4);--card:light-dark(#ffffff,#1d2127);--line:light-dark(#d9dce1,#333943);--paper:#ffffff;--acc:#c1121f}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "IBM Plex Sans",system-ui,sans-serif;overflow-x:clip}
+.band{padding:clamp(20px,3vw,40px) max(4vw,14px)}
+.wrap{max-width:1240px;margin:0 auto}
+h1{font:600 clamp(28px,4vw,42px)/1.08 Literata,Georgia,serif;margin:0 0 10px;text-wrap:balance}
+h2{font:600 24px/1.15 Literata,Georgia,serif;margin:36px 0 12px}
+h3{font:600 17px/1.3 "IBM Plex Sans",sans-serif;margin:0 0 6px}
+p{margin:0 0 10px;max-width:70ch}
+.lead{color:var(--mut);font-size:17px}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:14px 0 12px;font-size:14px}
+.legend span{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.sw{display:inline-block;width:26px;height:6px;border-radius:3px;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+.paper{background:var(--paper);border:1px solid var(--line);border-radius:12px;color:#10131a}
+.scroll{overflow-x:auto}
+.fig-main svg{display:block;width:100%;min-width:980px;height:auto}
+.hint{font-size:13px;color:var(--mut);margin-top:6px}
+.zooms{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:14px;margin-top:14px}
+.zooms .paper{padding:14px}
+.zooms svg{display:block;width:100%;height:auto}
+.zooms p{font-size:14px;color:#3d434d;margin:6px 0 0}
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px;margin-top:8px}
+.notes div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;font-size:15px}
+.notes b{display:block;margin-bottom:4px}
+table{border-collapse:collapse;width:100%;font-size:14.5px;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-weight:600;font-size:13.5px;color:var(--mut);background:light-dark(#f5f6f8,#22262d)}
+tr.sec td{background:light-dark(#f0f2f5,#252a31);font-weight:600;font-size:13.5px}
+tr.done td:not(:first-child){color:var(--mut);text-decoration:line-through;text-decoration-color:rgba(127,127,127,.6)}
+td.n{font-weight:700;white-space:nowrap}
+td.cor{white-space:nowrap}
+.tag{display:inline-grid;place-items:center;min-width:24px;height:22px;padding:0 5px;border-radius:11px;border:2px solid;font:700 12px "IBM Plex Sans Condensed",sans-serif;background:#fff;color:#111}
+input[type=checkbox]{width:22px;height:22px;accent-color:#16a05a;cursor:pointer;margin:0}
+label.ck{display:inline-grid;place-items:center;width:44px;height:36px;cursor:pointer}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:0 0 10px}
+.prog{flex:1 1 220px;height:10px;border-radius:5px;background:var(--line);overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:#16a05a;transition:width .25s}
+button{font:600 14px "IBM Plex Sans",sans-serif;min-height:44px;padding:0 16px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid #2f6fd6;outline-offset:2px}
+.schem{padding:12px}
+.schem svg{display:block;width:100%;min-width:760px;height:auto}
+@media (prefers-reduced-motion:reduce){.prog i{transition:none}}
+@media(max-width:600px){table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px;border-bottom:1px solid var(--line)}.stack td{display:flow-root;border:0;padding:3px 10px;padding-inline-start:8em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:7.5em;margin-inline-start:-8em;white-space:normal;color:var(--mut)}.stack td:empty{display:none}.stack tr.sec td{padding-inline-start:10px}.stack tr.sec td::before{display:none}}
+</style>
+<script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
+</head>
+<body>
+<div class="band"><div class="wrap">
+<h1>Cancela de estacionamento: ligação na protoboard MP-1680</h1>
+<p class="lead">O ESP32 atravessa as duas placas. VIN, GND e o servo (GPIO 13) ficam na Placa A; os dois HC-SR04 e seus divisores de tensão ficam na Placa B, junto dos GPIO 5, 18, 19 e 21.</p>
+<div class="legend">
+<span><i class="sw" style="background:#e02424"></i>Vermelho: 5 V</span>
+<span><i class="sw" style="background:#24262b"></i>Preto: GND</span>
+<span><i class="sw" style="background:#f2c21b"></i>Amarelo: TRIG</span>
+<span><i class="sw" style="background:#16a05a"></i>Verde: ECHO / junção</span>
+<span><i class="sw" style="background:#f57c00"></i>Laranja: sinal do servo</span>
+<span><b class="tag" style="border-color:#555">7</b>Número no fio = linha do checklist</span>
+</div>
+
+<div class="paper scroll fig-main"><svg id="bb" viewBox="0 0 1000 900" role="img" aria-label="Vista de protoboard da cancela com ESP32, MB102, dois HC-SR04 e servo SG90"></svg></div>
+<p class="hint">Colunas contadas a partir da ponta do MB102 (coluna 1 à esquerda). Furos a–e e f–j de cada coluna são ligados entre si; o canal do meio separa as metades. Em tela estreita, arraste o desenho para o lado.</p>
+
+<h2>Divisores de tensão ampliados</h2>
+<div class="zooms">
+<div class="paper"><h3>Detalhe 1 · HC-SR04 ENTRADA (Placa B, colunas 11, 14 e 17)</h3><svg id="z1" viewBox="0 0 400 462" role="img" aria-label="Divisor de tensão da ENTRADA ampliado"></svg><p>R1 = 1 kΩ (marrom, preto, vermelho, dourado) · R2 = 2 kΩ (vermelho, preto, vermelho, dourado)</p></div>
+<div class="paper"><h3>Detalhe 2 · HC-SR04 SAÍDA (Placa B, colunas 40, 43 e 46)</h3><svg id="z2" viewBox="0 0 400 462" role="img" aria-label="Divisor de tensão da SAÍDA ampliado"></svg><p>R3 = 1 kΩ · R4 = 2 kΩ. A coluna do meio é a junção: é dela que sai o fio verde para o GPIO.</p></div>
+</div>
+
+<h2>Antes de ligar a fonte</h2>
+<div class="notes">
+<div><b>Polaridade do MB102</b>Ao encaixar, confira que o pino + do módulo cai na faixa vermelha das barras, em cima e embaixo. Invertido, ele coloca 5 V no GND de tudo.</div>
+<div><b>Barras divididas</b>Algumas protoboards longas têm as barras cortadas no meio do comprimento. Meça com o multímetro entre as colunas 7 e 52 da barra de baixo da Placa B; se não houver continuidade, faça uma ponte entre as metades.</div>
+<div><b>Regulador quente</b>Com 9 V na entrada, o regulador 5 V do MB102 transforma em calor os 4 V que sobram. Se o ESP32 reiniciar quando a cancela mexe, toque no regulador: se estiver muito quente, use uma fonte de 7,5 V ou alimente o servo à parte (GND em comum).</div>
+<div><b>Gravando pelo USB</b>Por precaução, desligue a chave do MB102 enquanto o ESP32 estiver no cabo USB do computador, para não ter duas fontes de 5 V ligadas ao mesmo tempo.</div>
+</div>
+
+<h2>Checklist de montagem</h2>
+<div class="bar"><div class="prog" aria-hidden="true"><i id="pg"></i></div><span id="pc">0 de 0 feitos</span><button id="clr" type="button">Desmarcar tudo</button></div>
+<table class="stack" id="ck"><thead><tr><th>Feito</th><th>#</th><th>Componente</th><th>Pino</th><th>Liga em</th><th>Placa (A/B)</th><th>Cor do fio</th></tr></thead><tbody></tbody></table>
+
+<h2>Esquema elétrico para conferência</h2>
+<div class="paper scroll schem"><svg id="sch" viewBox="0 90 1000 380" role="img" aria-label="Esquema elétrico simplificado da cancela"></svg></div>
+<p class="hint">O ponto cheio marca ligação (junções J1 e J2). Desenho do MB102 baseado no modelo comum do mercado.</p>
+</div></div>
+
+<script>
+{
+const P=13,X0=150,yA=190,yB=450,BH=19.4*P;
+const R={'+t':1.2,'-t':2.2,a:4.2,b:5.2,c:6.2,d:7.2,e:8.2,f:11.2,g:12.2,h:13.2,i:14.2,j:15.2,'-b':17.2,'+b':18.2};
+const X=c=>X0+(c-1)*P;
+const Y=(b,r)=>(b==='A'?yA:yB)+R[r]*P;
+const C={r:'#e02424',k:'#24262b',y:'#f2c21b',g:'#16a05a',o:'#f57c00'};
+const D={r:'#8f1010',k:'#000',y:'#8a6a00',g:'#0a5a32',o:'#9a4a00'};
+const NAME={r:'vermelho',k:'preto',y:'amarelo',g:'verde',o:'laranja'};
+const F="font-family:'IBM Plex Sans Condensed','Arial Narrow',sans-serif";
+let s=`<defs>
+<rect id="h" x="-2.2" y="-2.2" width="4.4" height="4.4" rx=".8" fill="#5d6064"/>
+<pattern id="mesh" width="4" height="4" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r=".9" fill="#7d848b"/></pattern>
+<pattern id="boom" width="28" height="12" patternUnits="userSpaceOnUse"><rect width="14" height="12" fill="#d62828"/><rect x="14" width="14" height="12" fill="#fff"/></pattern>
+</defs>
+<style>.t{${F};fill:#1b1d22}.w{${F};fill:#fff}.halo{paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round}.sm{${F};font-size:8px;fill:#8a887f}</style>
+<rect width="1000" height="900" fill="#fff"/>`;
+
+/* ---------- protoboards ---------- */
+function board(b){
+  const y0=b==='A'?yA:yB,xl=X0-P-2,xr=X(64)+P;
+  let o=`<rect x="${xl}" y="${y0}" width="${xr-xl}" height="${BH}" rx="6" fill="#f4f3ee" stroke="#c9c7bd"/>`;
+  o+=`<rect x="${xl+6}" y="${y0+9.15*P}" width="${xr-xl-12}" height="${1.1*P}" rx="2" fill="#e2e0d6"/>`;
+  const L=(yy,c)=>`<line x1="${X0-5}" x2="${X(64)+5}" y1="${yy}" y2="${yy}" stroke="${c}" stroke-width="1.6"/>`;
+  o+=L(y0+.5*P,'#d63a3a')+L(y0+2.9*P,'#2f6fd6')+L(y0+16.5*P,'#2f6fd6')+L(y0+18.9*P,'#d63a3a');
+  for(const r of 'abcdefghij') for(let c=1;c<=64;c++) o+=`<use href="#h" x="${X(c)}" y="${Y(b,r)}"/>`;
+  for(const r of ['+t','-t','-b','+b']) for(let c=1;c<=64;c++) if(c%6) o+=`<use href="#h" x="${X(c)}" y="${Y(b,r)}"/>`;
+  for(const r of 'abcdefghij'){o+=`<text class="sm" x="${xl+7}" y="${Y(b,r)+3}">${r}</text><text class="sm" x="${xr-11}" y="${Y(b,r)+3}">${r}</text>`}
+  for(const c of [1,5,10,15,20,25,30,35,40,45,50,55,60,64]){o+=`<text class="sm" text-anchor="middle" x="${X(c)}" y="${y0+3.45*P}">${c}</text><text class="sm" text-anchor="middle" x="${X(c)}" y="${y0+16.45*P}">${c}</text>`}
+  for(const [r,sg,col] of [['+t','+','#d63a3a'],['-t','−','#2f6fd6'],['-b','−','#2f6fd6'],['+b','+','#d63a3a']]){
+    o+=`<text x="${xr-10}" y="${Y(b,r)+4}" style="${F};font-size:11px;font-weight:700;fill:${col}">${sg}</text>`;
+    if(b==='B')o+=`<text x="${xl+5}" y="${Y(b,r)+4}" style="${F};font-size:11px;font-weight:700;fill:${col}">${sg}</text>`;
+  }
+  o+=`<text class="t" x="${X(51)}" y="${y0+9.7*P+3.5}" style="font-size:10px;font-weight:700;fill:#6b6960">PLACA ${b} · 640 furos</text>`;
+  return o;
+}
+s+=board('A')+board('B');
+
+/* ---------- ESP32 ---------- */
+{
+  const yt=Y('A','j'),yb=Y('B','a'),x1=X(20)-2.6*P,x2=X(34)+3.2*P;
+  const TOP=['VIN','GND','D13','D12','D14','D27','D26','D25','D33','D32','D35','D34','VN','VP','EN'];
+  const BOT=['3V3','GND','D15','D2','D4','RX2','TX2','D5','D18','D19','D21','RX0','TX0','D22','D23'];
+  const HL={VIN:'#ff8a8a',D13:'#ffb066',D5:'#ffe066',D18:'#7ee2a8',D19:'#ffe066',D21:'#7ee2a8'};
+  s+=`<rect x="${x1-12}" y="${(yt+yb)/2-10}" width="20" height="20" rx="2" fill="#b9bec4" stroke="#7d848b"/>`;
+  s+=`<rect x="${x1}" y="${yt-.75*P}" width="${x2-x1}" height="${yb-yt+1.5*P}" rx="4" fill="#1d2833" stroke="#0c1117"/>`;
+  s+=`<rect x="${X(28)-3}" y="${yt+33}" width="${x2-X(28)-2}" height="52" rx="2" fill="#c8ccd1" stroke="#8d949b"/>`;
+  s+=`<path d="M${x2-14} ${yt+38} v42" stroke="#8d949b" stroke-width="7" stroke-dasharray="3 3"/>`;
+  s+=`<text x="${X(28)+4}" y="${yt+56}" style="${F};font-size:9px;font-weight:700;fill:#3b4148">ESP-WROOM-32</text><text x="${X(28)+4}" y="${yt+68}" style="${F};font-size:8px;fill:#5c636b">antena →</text>`;
+  s+=`<text class="w" x="${X(21)}" y="${yt+58}" style="font-size:15px;font-weight:700">ESP32</text><text class="w" x="${X(21)}" y="${yt+72}" style="font-size:10px;font-weight:600">DEVKIT V1</text>`;
+  s+=`<rect x="${x1+5}" y="${yt+34}" width="9" height="9" fill="#555"/><rect x="${x1+5}" y="${yb-43}" width="9" height="9" fill="#555"/>`;
+  TOP.forEach((n,i)=>{const x=X(20+i);s+=`<rect x="${x-3.5}" y="${yt-3.5}" width="7" height="7" fill="#d4b24c"/><circle cx="${x}" cy="${yt}" r="1.6" fill="#5a4a14"/>`;
+    s+=`<text x="${x+3.3}" y="${yt+8}" transform="rotate(-90 ${x+3.3} ${yt+8})" text-anchor="end" style="${F};font-size:9.5px;font-weight:${HL[n]?700:500};fill:${HL[n]||'#c9d3dc'}">${n}</text>`});
+  BOT.forEach((n,i)=>{const x=X(20+i);s+=`<rect x="${x-3.5}" y="${yb-3.5}" width="7" height="7" fill="#d4b24c"/><circle cx="${x}" cy="${yb}" r="1.6" fill="#5a4a14"/>`;
+    s+=`<text x="${x+3.3}" y="${yb-8}" transform="rotate(-90 ${x+3.3} ${yb-8})" text-anchor="start" style="${F};font-size:9.5px;font-weight:${HL[n]?700:500};fill:${HL[n]||'#c9d3dc'}">${n}</text>`});
+  s+=`<circle cx="${X(20)}" cy="${yb}" r="7.5" fill="none" stroke="#ff3b3b" stroke-width="2"/><path d="M${X(20)-5.3} ${yb-5.3}l10.6 10.6" stroke="#ff3b3b" stroke-width="2"/>`;
+}
+
+/* ---------- MB102 ---------- */
+{
+  const x1=38,x2=214,y1=yA-6,y2=yA+BH+6;
+  s+=`<rect x="8" y="${yA+38}" width="24" height="20" rx="3" fill="#2a2a2a"/><path d="M8 ${yA+48} C-6 ${yA+48} 2 ${yA-10} 14 ${yA-40}" fill="none" stroke="#2a2a2a" stroke-width="5"/>`;
+  s+=`<rect x="${x1}" y="${y1}" width="${x2-x1}" height="${y2-y1}" rx="5" fill="#b3222b" stroke="#6e1218" stroke-width="1.5"/>`;
+  s+=`<rect x="28" y="${yA+26}" width="60" height="46" rx="3" fill="#1c1c1c"/><circle cx="40" cy="${yA+49}" r="9" fill="#444" stroke="#000"/><circle cx="40" cy="${yA+49}" r="3" fill="#bbb"/>`;
+  s+=`<text class="w" x="68" y="${yA+86}" text-anchor="middle" style="font-size:9px;font-weight:700">DC IN (P4)</text>`;
+  s+=`<rect x="24" y="${yA+108}" width="58" height="40" rx="2" fill="#c3c8cd" stroke="#7d848b"/><rect x="30" y="${yA+120}" width="44" height="16" fill="#2f3337"/>`;
+  s+=`<text class="w" x="54" y="${yA+162}" text-anchor="middle" style="font-size:9px;font-weight:700">USB</text>`;
+  s+=`<rect x="100" y="${yA+30}" width="28" height="28" rx="3" fill="#1c1c1c"/><circle cx="114" cy="${yA+44}" r="8" fill="#f2f2f2"/><text class="w" x="114" y="${yA+70}" text-anchor="middle" style="font-size:8px">ON/OFF</text>`;
+  s+=`<rect x="104" y="${yA+92}" width="10" height="6" rx="1" fill="#4cff7a" stroke="#1d7a3a"/><text class="w" x="120" y="${yA+98}" style="font-size:8px">PWR</text>`;
+  for(const yy of [yA+120,yA+170]){s+=`<rect x="98" y="${yy}" width="34" height="20" rx="1" fill="#1c1c1c"/><rect x="106" y="${yy-7}" width="18" height="7" fill="#9aa1a8"/><text class="w" x="115" y="${yy+13}" text-anchor="middle" style="font-size:6.5px">AMS1117</text>`}
+  s+=`<text class="w" x="96" y="${y2-22}" style="font-size:16px;font-weight:700">MB102</text>`;
+  for(const yy of [yA+44,yA+BH-46]){
+    s+=`<text class="w" x="150" y="${yy-10}" style="font-size:8px;font-weight:700">5V</text><text class="w" x="171" y="${yy-10}" style="font-size:7px">OFF</text><text class="w" x="190" y="${yy-10}" style="font-size:7px">3.3V</text>`;
+    for(const xx of [154,175,196])s+=`<rect x="${xx-2.5}" y="${yy-2.5}" width="5" height="5" fill="#d4b24c"/>`;
+    s+=`<rect x="149" y="${yy-6}" width="32" height="12" rx="2" fill="#f6c90e" stroke="#8a6a00"/>`;
+  }
+  for(const [r,sg] of [['+t','+'],['-t','−'],['-b','−'],['+b','+']]){const x=X(2),y=Y('A',r);s+=`<rect x="${x-3.5}" y="${y-3.5}" width="7" height="7" fill="#d4b24c" stroke="#6e5512" stroke-width=".8"/><text class="w" x="${x+8}" y="${y+4}" style="font-size:10px;font-weight:700">${sg}</text>`}
+}
+
+/* ---------- resistores e capacitor ---------- */
+const BANDS={'1k':['#7b4a26','#111','#d62828','#c9a227'],'2k':['#d62828','#111','#d62828','#c9a227']};
+function res(a,b,v,lab,ly,sc=1){
+  const [x1,y]=a,[x2]=b,m=(x1+x2)/2,L=24*sc,H=8*sc;
+  let o=`<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="#9aa0a6" stroke-width="${1.8*sc}"/>`;
+  o+=`<rect x="${m-L/2}" y="${y-H/2}" width="${L}" height="${H}" rx="${H/2}" fill="#e6cf9f" stroke="#a88b55" stroke-width="${.8*sc}"/>`;
+  BANDS[v].forEach((c,i)=>{o+=`<rect x="${m-L/2+(i<3?4+i*4.2:18)*sc}" y="${y-H/2}" width="${2.2*sc}" height="${H}" fill="${c}"/>`});
+  for(const x of [x1,x2])o+=`<circle cx="${x}" cy="${y}" r="${2*sc}" fill="#9aa0a6"/>`;
+  if(lab)o+=`<text class="t halo" x="${m}" y="${ly}" text-anchor="middle" style="font-size:${sc>1?13:10}px;font-weight:700">${lab}</text>`;
+  return o;
+}
+s+=res([X(17),Y('B','g')],[X(14)],'1k','1 kΩ',Y('B','h')+3.5);
+s+=res([X(14),Y('B','i')],[X(11)],'2k','2 kΩ',Y('B','j')+3.5);
+s+=res([X(40),Y('B','g')],[X(43)],'1k','1 kΩ',Y('B','h')+3.5);
+s+=res([X(43),Y('B','i')],[X(46)],'2k','2 kΩ',Y('B','j')+3.5);
+for(const [c,lab,dx,anc] of [[14,'J1',-8,'end'],[43,'J2',8,'start']]){
+  s+=`<rect x="${X(c)-6}" y="${Y('B','f')-6}" width="12" height="${Y('B','j')-Y('B','f')+12}" rx="6" fill="rgba(22,160,90,.16)" stroke="#16a05a" stroke-width="1.2" stroke-dasharray="3 2"/>`;
+  s+=`<text class="t halo" x="${X(c)+dx}" y="${Y('B','h')+(c===14?-3:3.5)}" text-anchor="${anc}" style="font-size:11px;font-weight:700;fill:#0a5a32">${lab}</text>`;
+}
+{ // capacitor
+  const xa=X(32),xb=X(33);
+  s+=`<line x1="${xa}" y1="182" x2="${xa}" y2="${Y('A','+t')}" stroke="#9aa0a6" stroke-width="1.8"/><line x1="${xb}" y1="182" x2="${xb}" y2="${Y('A','-t')}" stroke="#9aa0a6" stroke-width="1.8"/>`;
+  s+=`<rect x="${xa-9}" y="146" width="${xb-xa+18}" height="38" rx="5" fill="#1f3f8a" stroke="#0f2250"/><rect x="${xb-2}" y="146" width="11" height="38" fill="#cfd6e4"/><text x="${xb+3.5}" y="160" text-anchor="middle" style="${F};font-size:11px;font-weight:700;fill:#1f3f8a">−</text><text x="${xb+3.5}" y="176" text-anchor="middle" style="${F};font-size:11px;font-weight:700;fill:#1f3f8a">−</text>`;
+  s+=`<text class="t halo" x="${xb+16}" y="162" style="font-size:10.5px;font-weight:700">C 470–1000 µF / 16 V</text><text class="t halo" x="${xb+16}" y="175" style="font-size:9.5px">faixa (−) no GND</text>`;
+}
+
+/* ---------- servo SG90 ---------- */
+{
+  s+=`<rect x="588" y="80" width="141" height="21" rx="3" fill="#5f8fd0" stroke="#2c5b9c"/><circle cx="594" cy="90.5" r="2.5" fill="#fff"/><circle cx="723" cy="90.5" r="2.5" fill="#fff"/>`;
+  s+=`<rect x="600" y="60" width="117" height="61" rx="5" fill="#2f6db5" stroke="#1d4a80"/>`;
+  s+=`<text class="w" x="676" y="94" text-anchor="middle" style="font-size:13px;font-weight:700">SG90</text><text class="w" x="676" y="108" text-anchor="middle" style="font-size:9px">micro servo</text>`;
+  s+=`<rect x="624" y="84.5" width="352" height="12" rx="3" fill="url(#boom)" stroke="#8a1010"/><circle cx="628" cy="90.5" r="10" fill="#f1f1f1" stroke="#999"/><circle cx="628" cy="90.5" r="3" fill="#aaa"/>`;
+  s+=`<text class="t halo" x="800" y="78" style="font-size:12px;font-weight:700">cancela (braço no eixo)</text>`;
+  const leads=[['#7b4a26',96,462],['#d62828',100,449],['#f28c28',104,436]];
+  for(const [c,y,x] of leads)s+=`<path d="M600 ${y} C540 ${y} ${x} 112 ${x} 140" fill="none" stroke="${c}" stroke-width="3"/>`;
+  s+=`<rect x="426" y="140" width="46" height="20" rx="2" fill="#1c1c1c"/>`;
+  [['S',436],['+',449],['−',462]].forEach(([t,x])=>{s+=`<text class="w" x="${x}" y="154" text-anchor="middle" style="font-size:10px;font-weight:700">${t}</text>`});
+  s+=`<text class="t halo" x="420" y="134" text-anchor="end" style="font-size:9.5px">conector do servo: S laranja · + vermelho · − marrom</text>`;
+}
+
+/* ---------- sensores HC-SR04 ---------- */
+function sensor(cx,name){
+  const x=cx-117,y=760;
+  let o=`<rect x="${x}" y="${y}" width="234" height="104" rx="5" fill="#1d63a8" stroke="#123f6d"/>`;
+  for(const dx of [-62,62])o+=`<circle cx="${cx+dx}" cy="${y+52}" r="40" fill="#c7ccd1" stroke="#8b9299" stroke-width="2"/><circle cx="${cx+dx}" cy="${y+52}" r="31" fill="#3a3f45"/><circle cx="${cx+dx}" cy="${y+52}" r="31" fill="url(#mesh)"/>`;
+  o+=`<rect x="${cx-27}" y="${y-8}" width="54" height="9" fill="#202225"/>`;
+  ['GND','ECHO','TRIG','VCC'].forEach((p,i)=>{const px=cx-19.5+13*i;
+    o+=`<rect x="${px-1.6}" y="${y-18}" width="3.2" height="12" fill="#d4b24c"/>`;
+    o+=`<text x="${px+3.3}" y="${y+5}" transform="rotate(-90 ${px+3.3} ${y+5})" text-anchor="end" style="${F};font-size:9.5px;font-weight:700;fill:#fff">${p}</text>`});
+  o+=`<text class="w" x="${cx}" y="${y+98}" text-anchor="middle" style="font-size:8.5px;font-weight:600">HC-SR04</text>`;
+  o+=`<text class="t" x="${cx}" y="${y+124}" text-anchor="middle" style="font-size:14px;font-weight:700">HC-SR04 ${name}</text>`;
+  return o;
+}
+s+=sensor(397,'ENTRADA')+sensor(748,'SAÍDA');
+
+/* ---------- caixas de detalhe ---------- */
+for(const [a,b,lab] of [[11,17,'Detalhe 1'],[40,47,'Detalhe 2']]){
+  s+=`<rect x="${X(a)-10}" y="${Y('B','f')-9}" width="${X(b)-X(a)+20}" height="${Y('B','-b')-Y('B','f')+17}" rx="6" fill="none" stroke="#c1121f" stroke-width="1.4" stroke-dasharray="5 3"/>`;
+  s+=`<text class="t halo" x="${X(b)+14}" y="${Y('B','f')+4}" style="font-size:10.5px;font-weight:700;fill:#c1121f">${lab} ↓</text>`;
+}
+
+/* ---------- fios ---------- */
+const bz=(t,p0,p1,p2,p3)=>[0,1].map(k=>(1-t)**3*p0[k]+3*(1-t)**2*t*p1[k]+3*(1-t)*t**2*p2[k]+t**3*p3[k]);
+const W=[
+ [1,'r',[X(7),Y('A','+b')],[X(7),Y('B','+b')],[X(7)-22,Y('A','+b')+90],[X(7)-22,Y('B','+b')-90],.5],
+ [2,'k',[X(8),Y('A','-b')],[X(8),Y('B','-b')],[X(8)+22,Y('A','-b')+90],[X(8)+22,Y('B','-b')-90],.5],
+ [3,'r',[X(20),Y('A','+t')],[X(20),Y('A','f')],[X(20)-14,Y('A','+t')+50],[X(20)-14,Y('A','f')-50],.5],
+ [4,'k',[X(21),Y('A','-t')],[X(21),Y('A','g')],[X(21)+9,Y('A','-t')+50],[X(21)+9,Y('A','g')-50],.62],
+ [5,'o',[436,160],[X(22),Y('A','h')],[444,240],[X(22)+14,Y('A','h')-60],.55],
+ [6,'r',[449,160],[X(26),Y('A','+t')],[449,186],[X(26),Y('A','+t')-24],.25],
+ [7,'k',[462,160],[X(27),Y('A','-t')],[462,190],[X(27),Y('A','-t')-30],null],
+ [8,'r',[416.5,744],[X(23),Y('B','+b')],[416.5,715],[X(23),Y('B','+b')+28],.45],
+ [9,'k',[377.5,744],[X(15),Y('B','-b')],[377.5,712],[X(15),Y('B','-b')+36],.5],
+ [10,'y',[403.5,744],[X(27),Y('B','e')],[403.5,660],[X(27),640],.6],
+ [11,'g',[390.5,744],[X(17),Y('B','j')],[390.5,700],[X(17),Y('B','j')+50],.42],
+ [12,'g',[X(14),Y('B','f')],[X(28),Y('B','c')],[X(14),540],[X(28)-60,Y('B','c')],.5],
+ [13,'k',[X(11),Y('B','j')],[X(11),Y('B','-b')],[X(11)-7,Y('B','j')+10],[X(11)-7,Y('B','-b')-10],null],
+ [14,'r',[767.5,744],[X(52),Y('B','+b')],[767.5,712],[X(52),Y('B','+b')+30],.5],
+ [15,'k',[728.5,744],[X(43),Y('B','-b')],[728.5,712],[X(43),Y('B','-b')+34],.5],
+ [17,'g',[741.5,744],[X(40),Y('B','j')],[741.5,680],[X(40)+30,Y('B','j')+6],.62],
+ [18,'g',[X(43),Y('B','f')],[X(30),Y('B','c')],[X(43),545],[X(30)+70,Y('B','c')],.42],
+ [19,'k',[X(46),Y('B','j')],[X(47),Y('B','-b')],[X(46),Y('B','j')+14],[X(47),Y('B','-b')-14],null]
+];
+const ch=yB+9.7*P;
+const custom=[[16,'y',`M754.5,744 C758,700 760,640 760,602 C760,586 752,${ch} 736,${ch} L548,${ch} C526,${ch} ${X(29)},${ch-4} ${X(29)},${Y('B','e')}`,[754.5,744],[X(29),Y('B','e')],[640,ch]]];
+const tags={7:[X(27)+14,Y('A','-t')-14],13:[X(11)-16,Y('B','j')+14],19:[X(47)+14,Y('B','-b')-14]};
+function wireSvg(n,k,d,a,b,tp){
+  let o=`<path d="${d}" fill="none" stroke="${D[k]}" stroke-width="5.6" stroke-linecap="round"/><path d="${d}" fill="none" stroke="${C[k]}" stroke-width="3.8" stroke-linecap="round"/><path d="${d}" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="1" stroke-linecap="round"/>`;
+  for(const p of [a,b])o+=`<circle cx="${p[0]}" cy="${p[1]}" r="3.4" fill="${C[k]}" stroke="${D[k]}" stroke-width="1.4"/>`;
+  return {o,t:`<circle cx="${tp[0]}" cy="${tp[1]}" r="7.5" fill="#fff" stroke="${D[k]}" stroke-width="1.8"/><text x="${tp[0]}" y="${tp[1]+3.4}" text-anchor="middle" style="${F};font-size:10px;font-weight:700;fill:#111">${n}</text>`};
+}
+let wires='',tagSvg='';
+for(const [n,k,a,b,c1,c2,t] of W){
+  const d=`M${a[0]},${a[1]} C${c1[0]},${c1[1]} ${c2[0]},${c2[1]} ${b[0]},${b[1]}`;
+  const tp=tags[n]||bz(t,a,c1,c2,b);
+  const r=wireSvg(n,k,d,a,b,tp);wires+=r.o;tagSvg+=r.t;
+}
+for(const [n,k,d,a,b,tp] of custom){const r=wireSvg(n,k,d,a,b,tp);wires+=r.o;tagSvg+=r.t}
+s+=wires+tagSvg;
+
+/* ---------- balões ---------- */
+function balloon(x,y,w,lines,pts,col='#10131a'){
+  let o='';
+  for(const p of pts)o+=`<path d="M${p[2]} ${p[3]} L${p[0]} ${p[1]}" stroke="${col}" stroke-width="1.3" stroke-dasharray="4 3"/><circle cx="${p[0]}" cy="${p[1]}" r="3" fill="${col}"/>`;
+  o+=`<rect x="${x}" y="${y}" width="${w}" height="${lines.length*16+14}" rx="8" fill="#fffbe6" stroke="${col}" stroke-width="1.4"/>`;
+  lines.forEach((l,i)=>{o+=`<text class="t" x="${x+10}" y="${y+22+i*16}" style="font-size:12.5px;font-weight:${i===0?700:500}">${l}</text>`});
+  return o;
+}
+s+=balloon(12,22,262,['Os dois jumpers em 5V','· entrada: fonte 9 V 1 A no jack P4'],[[165,yA+44,150,68],[44,yA+49,60,68]]);
+s+=balloon(662,322,312,['Alimentado pelo VIN (5 V).','Nunca ligue 5 V no pino 3V3.'],[[X(20)+3,Y('A','j')-5,662,345]]);
+s+=balloon(6,505,124,['Sem estes','jumpers a PLACA B','fica sem energia'],[[X(7)-16,560,130,540]],'#c1121f');
+document.getElementById('bb').innerHTML=s;
+
+/* ---------- detalhes ampliados ---------- */
+function zoom(el,o){
+  const Pz=34,x0=38,lo=o.lo,zx=c=>x0+(c-lo)*Pz+Pz/2;
+  const zr={f:92,g:126,h:160,i:194,j:228,'-b':278,'+b':312};
+  let z=`<style>.t{${F};fill:#1b1d22}.halo{paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}</style><rect width="400" height="462" fill="#fff"/>`;
+  z+=`<rect x="${x0-8}" y="66" width="${9*Pz+16}" height="270" rx="8" fill="#f4f3ee" stroke="#c9c7bd"/>`;
+  z+=`<line x1="${x0}" x2="${x0+9*Pz}" y1="262" y2="262" stroke="#2f6fd6" stroke-width="2"/><line x1="${x0}" x2="${x0+9*Pz}" y1="328" y2="328" stroke="#d63a3a" stroke-width="2"/>`;
+  const fills={[o.X]:'rgba(22,160,90,.10)',[o.Y]:'rgba(22,160,90,.24)',[o.Z]:'rgba(0,0,0,.06)'};
+  for(const c of [o.X,o.Y,o.Z])z+=`<rect x="${zx(c)-12}" y="${zr.f-12}" width="24" height="${zr.j-zr.f+24}" rx="8" fill="${fills[c]}" ${c===o.Y?'stroke="#16a05a" stroke-dasharray="4 3" stroke-width="1.5"':''}/>`;
+  for(let c=lo;c<lo+9;c++){
+    z+=`<text class="t" x="${zx(c)}" y="80" text-anchor="middle" style="font-size:10px;fill:#8a887f">${c}</text>`;
+    for(const r of 'fghij')z+=`<rect x="${zx(c)-4}" y="${zr[r]-4}" width="8" height="8" rx="1.5" fill="#5d6064"/>`;
+    if(c%6)for(const r of ['-b','+b'])z+=`<rect x="${zx(c)-4}" y="${zr[r]-4}" width="8" height="8" rx="1.5" fill="#5d6064"/>`;
+  }
+  for(const r of 'fghij')z+=`<text class="t" x="${x0+9*Pz+14}" y="${zr[r]+4}" style="font-size:11px;fill:#8a887f">${r}</text>`;
+  z+=`<text x="${x0+9*Pz+12}" y="${zr['-b']+5}" style="${F};font-size:15px;font-weight:700;fill:#2f6fd6">−</text><text x="${x0+9*Pz+12}" y="${zr['+b']+5}" style="${F};font-size:15px;font-weight:700;fill:#d63a3a">+</text>`;
+  z+=`<text class="t" x="${o.Z<o.X?x0+9*Pz-4:x0+4}" y="${zr['-b']-20}" text-anchor="${o.Z<o.X?'end':'start'}" style="font-size:10.5px;font-weight:600;fill:#2f6fd6">barra − (GND) da Placa B</text>`;
+  z+=res([zx(o.X),zr.g],[zx(o.Y)],'1k',`${o.r[0]} · 1 kΩ`,zr.g-18,2.2);
+  z+=res([zx(o.Y),zr.i],[zx(o.Z)],'2k',`${o.r[1]} · 2 kΩ`,zr.i-18,2.2);
+  const wz=(k,d,a,b)=>`<path d="${d}" fill="none" stroke="${D[k]}" stroke-width="9" stroke-linecap="round"/><path d="${d}" fill="none" stroke="${C[k]}" stroke-width="6.5" stroke-linecap="round"/>`+[a,b].filter(Boolean).map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="5" fill="${C[k]}" stroke="${D[k]}" stroke-width="2"/>`).join('');
+  z+=wz('g',`M${zx(o.X)} 372 V${zr.j}`,[zx(o.X),zr.j]);
+  z+=wz('g',`M${zx(o.Y)} ${zr.f} V28`,[zx(o.Y),zr.f]);
+  z+=wz('k',`M${zx(o.Z)} ${zr.j} C${zx(o.Z)} ${zr.j+22} ${zx(o.zr)} ${zr['-b']-22} ${zx(o.zr)} ${zr['-b']}`,[zx(o.Z),zr.j],[zx(o.zr),zr['-b']]);
+  z+=`<text class="t halo" x="${zx(o.Y)}" y="18" text-anchor="middle" style="font-size:12px;font-weight:700;fill:#0a5a32">→ ${o.gp}</text>`;
+  z+=`<text class="t halo" x="${zx(o.X)}" y="390" text-anchor="middle" style="font-size:12px;font-weight:700;fill:#0a5a32">↑ ECHO do HC-SR04 ${o.name}</text>`;
+  const jx=zx(o.Y)+(o.X>o.Y?14:-14);
+  z+=`<text class="t halo" x="${jx}" y="${zr.h+5}" text-anchor="${o.X>o.Y?'start':'end'}" style="font-size:13px;font-weight:700;fill:#0a5a32">${o.j} ≈ 3,3 V</text>`;
+  z+=`<text class="t" x="200" y="424" text-anchor="middle" style="font-size:16px;font-weight:700">5 V × 2k/(1k+2k) ≈ 3,3 V</text>`;
+  z+=`<text class="t" x="200" y="446" text-anchor="middle" style="font-size:13.5px;font-weight:700;fill:#c1121f">— nunca ligue o ECHO direto no ESP32</text>`;
+  document.getElementById(el).innerHTML=z;
+}
+zoom('z1',{lo:10,X:17,Y:14,Z:11,zr:11,gp:'GPIO 18 (col 28, furo c)',name:'ENTRADA',j:'J1',r:['R1','R2']});
+zoom('z2',{lo:39,X:40,Y:43,Z:46,zr:47,gp:'GPIO 21 (col 30, furo c)',name:'SAÍDA',j:'J2',r:['R3','R4']});
+
+/* ---------- checklist ---------- */
+const rows=[
+ ['sec','Preparação'],
+ ['P1','MB102','2 jumpers amarelos','posição 5V (o de cima e o de baixo)','A',''],
+ ['P2','MB102','encaixe','ponta esquerda, nas barras + e − de cima e de baixo (pino + na faixa vermelha)','A',''],
+ ['P3','Fonte 9 V 1 A','plug','jack P4 do MB102 (deixe a chave desligada)','A',''],
+ ['P4','ESP32','fileira VIN … EN','furo j, colunas 20 a 34 (USB para a esquerda)','A',''],
+ ['P5','ESP32','fileira 3V3 … D23','furo a, colunas 20 a 34','B',''],
+ ['sec','Alimentação'],
+ ['1','Jumper 5V A→B','barra + de baixo, col 7','barra + de baixo, col 7','A→B','r'],
+ ['2','Jumper GND A→B','barra − de baixo, col 8','barra − de baixo, col 8','A→B','k'],
+ ['3','ESP32','VIN (col 20, furo f)','barra + de cima, col 20','A','r'],
+ ['4','ESP32','GND (col 21, furo g)','barra − de cima, col 21','A','k'],
+ ['sec','Servo SG90 (cancela)'],
+ ['5','SG90','laranja (sinal)','GPIO 13 (col 22, furo h)','A','o'],
+ ['6','SG90','vermelho (V+)','barra + de cima, col 26','A','r'],
+ ['7','SG90','marrom (GND)','barra − de cima, col 27','A','k'],
+ ['C+','Capacitor 470–1000 µF','perna longa (+)','barra + de cima, col 32','A','perna'],
+ ['C−','Capacitor 470–1000 µF','perna da faixa (−)','barra − de cima, col 33','A','perna'],
+ ['sec','HC-SR04 ENTRADA'],
+ ['8','HC-SR04 ENTRADA','VCC','barra + de baixo, col 23','B','r'],
+ ['9','HC-SR04 ENTRADA','GND','barra − de baixo, col 15','B','k'],
+ ['10','HC-SR04 ENTRADA','TRIG','GPIO 5 (col 27, furo e)','B','y'],
+ ['11','HC-SR04 ENTRADA','ECHO','col 17, furo j (entrada do divisor)','B','g'],
+ ['R1','Resistor 1 kΩ','col 17, furo g','col 14, furo g (J1)','B','perna'],
+ ['R2','Resistor 2 kΩ','col 14, furo i (J1)','col 11, furo i','B','perna'],
+ ['12','Junção J1','col 14, furo f','GPIO 18 (col 28, furo c)','B','g'],
+ ['13','Divisor ENTRADA','col 11, furo j','barra − de baixo, col 11','B','k'],
+ ['sec','HC-SR04 SAÍDA'],
+ ['14','HC-SR04 SAÍDA','VCC','barra + de baixo, col 52','B','r'],
+ ['15','HC-SR04 SAÍDA','GND','barra − de baixo, col 43','B','k'],
+ ['16','HC-SR04 SAÍDA','TRIG','GPIO 19 (col 29, furo e)','B','y'],
+ ['17','HC-SR04 SAÍDA','ECHO','col 40, furo j (entrada do divisor)','B','g'],
+ ['R3','Resistor 1 kΩ','col 40, furo g','col 43, furo g (J2)','B','perna'],
+ ['R4','Resistor 2 kΩ','col 43, furo i (J2)','col 46, furo i','B','perna'],
+ ['18','Junção J2','col 43, furo f','GPIO 21 (col 30, furo c)','B','g'],
+ ['19','Divisor SAÍDA','col 46, furo j','barra − de baixo, col 47','B','k']
+];
+const KEY='cancela-ck-v1';let st={};try{st=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){st={}}
+const tb=document.querySelector('#ck tbody');
+tb.innerHTML=rows.map(r=>{
+  if(r[0]==='sec')return `<tr class="sec"><td colspan="7">${r[1]}</td></tr>`;
+  const [id,comp,pin,to,pl,k]=r;
+  const cor=C[k]?`<span class="sw" style="background:${C[k]}"></span> ${NAME[k]}`:(k==='perna'?'— (pernas do componente)':'—');
+  const num=C[k]?`<span class="tag" style="border-color:${D[k]}">${id}</span>`:`<b>${id}</b>`;
+  return `<tr data-id="${id}"><td><label class="ck"><input type="checkbox" id="ck-${id}" aria-label="Feito: ${id}"></label></td><td class="n">${num}</td><td>${comp}</td><td>${pin}</td><td>${to}</td><td>${pl}</td><td class="cor">${cor}</td></tr>`;
+}).join('');
+const boxes=[...tb.querySelectorAll('input')];
+function upd(){const n=boxes.filter(b=>b.checked).length;document.getElementById('pc').textContent=`${n} de ${boxes.length} feitos`;document.getElementById('pg').style.width=(100*n/boxes.length)+'%';
+  boxes.forEach(b=>b.closest('tr').classList.toggle('done',b.checked));try{localStorage.setItem(KEY,JSON.stringify(Object.fromEntries(boxes.map(b=>[b.closest('tr').dataset.id,b.checked]))))}catch(e){}}
+boxes.forEach(b=>{b.checked=!!st[b.closest('tr').dataset.id];b.addEventListener('change',upd)});
+document.getElementById('clr').addEventListener('click',()=>{boxes.forEach(b=>b.checked=false);upd()});
+upd();
+
+/* ---------- esquema elétrico ---------- */
+{
+  const ln=(d,c,w=2.2)=>`<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linejoin="round"/>`;
+  const v5=(x,y)=>ln(`M${x} ${y}V${y-16}M${x-9} ${y-16}h18`,'#e02424',2.4)+`<text x="${x}" y="${y-22}" text-anchor="middle" style="${F};font-size:12px;font-weight:700;fill:#c01818">5 V</text>`;
+  const gnd=(x,y)=>ln(`M${x} ${y}V${y+12}M${x-10} ${y+12}h20M${x-6} ${y+17}h12M${x-2.5} ${y+22}h5`,'#24262b',2.2);
+  const dot=(x,y)=>`<circle cx="${x}" cy="${y}" r="4" fill="#10131a"/>`;
+  const zz=(x1,y1,x2,y2,c)=>{const n=6,horiz=y1===y2,L=horiz?x2-x1:y2-y1,st=L/(n*2);let d=`M${x1} ${y1}`;for(let i=0;i<n*2;i++){const a=(i%2?-7:7);d+=horiz?` L${x1+st*(i+1)} ${y1+(i===n*2-1?0:a)}`:` L${x1+(i===n*2-1?0:a)} ${y1+st*(i+1)}`}return ln(d,c,2)};
+  const T=(x,y,t,o='')=>`<text x="${x}" y="${y}" ${o} style="${F};font-size:12.5px;fill:#1b1d22">${t}</text>`;
+  const B=(x,y,t,o='')=>`<text x="${x}" y="${y}" ${o} style="${F};font-size:13.5px;font-weight:700;fill:#1b1d22">${t}</text>`;
+  let z=`<rect y="90" width="1000" height="380" fill="#fff"/>`;
+  // MB102
+  z+=`<rect x="20" y="190" width="130" height="100" rx="6" fill="#fbe9ea" stroke="#b3222b" stroke-width="2"/>`+B(85,228,'MB102','text-anchor="middle"')+T(85,246,'jumpers em 5V','text-anchor="middle"')+T(85,262,'(os dois)','text-anchor="middle"');
+  z+=ln('M85 152V188','#24262b',2)+`<path d="M80 182l5 8 5-8z" fill="#24262b"/>`+T(85,142,'fonte 9 V 1 A · jack P4','text-anchor="middle"');
+  z+=ln('M150 215H180','#e02424',2.4)+v5(180,215)+T(156,210,'5V')+ln('M150 265H180','#24262b')+gnd(180,265)+T(154,260,'GND');
+  // capacitor
+  z+=v5(245,170)+ln('M245 170V222','#e02424',2.4)+ln('M230 222H260','#10131a',2.6)+`<path d="M230 236Q245 226 260 236" fill="none" stroke="#10131a" stroke-width="2.6"/>`+ln('M245 232V290','#24262b')+gnd(245,290);
+  z+=`<text x="264" y="219" style="${F};font-size:13px;font-weight:700">+</text>`+B(266,248,'C1')+T(266,264,'470–1000 µF')+T(266,279,'16 V');
+  // servo
+  z+=`<circle cx="380" cy="260" r="30" fill="#eaf1fb" stroke="#2f6db5" stroke-width="2.2"/>`+B(380,265,'M','text-anchor="middle"');
+  z+=ln('M380 230V200','#e02424',2.4)+v5(380,200)+ln('M380 290V330','#24262b')+gnd(380,330);
+  z+=ln('M410 260H500','#f57c00',2.6)+T(420,252,'laranja')+T(418,284,'SG90')+T(418,299,'(cancela)')+T(386,220,'vermelho')+T(386,316,'marrom');
+  // ESP32
+  z+=`<rect x="500" y="100" width="160" height="330" rx="6" fill="#eef1f4" stroke="#1d2833" stroke-width="2"/>`+B(580,122,'ESP32 DevKit V1','text-anchor="middle"')+T(580,138,'(30 pinos)','text-anchor="middle"');
+  z+=ln('M470 180H500','#e02424',2.4)+v5(470,180)+B(508,184,'VIN');
+  z+=B(508,264,'GPIO 13');
+  z+=ln('M478 305H500','#999',2)+ln('M472 299l12 12M484 299l-12 12','#c1121f',2.4)+`<text x="508" y="309" style="${F};font-size:12.5px;font-weight:700;fill:#c1121f">3V3 (não ligar)</text>`;
+  z+=ln('M470 390H500','#24262b')+gnd(470,390)+B(508,394,'GND');
+  for(const [y,n] of [[160,'GPIO 5'],[200,'GPIO 18'],[330,'GPIO 19'],[370,'GPIO 21']])z+=B(652,y+4,n,'text-anchor="end"');
+  // sensores e divisores
+  for(const [y0,nm,tr,rA,rB,J] of [[110,'ENTRADA',160,'R1','R2','J1'],[280,'SAÍDA',330,'R3','R4','J2']]){
+    const yv=y0+20,yt=tr,ye=tr+40,yg=tr+75;
+    z+=`<rect x="840" y="${y0}" width="140" height="${y0===110?140:150}" rx="6" fill="#e8f1fa" stroke="#1d63a8" stroke-width="2"/>`+B(930,y0+64,'HC-SR04','text-anchor="middle"')+B(930,y0+82,nm,'text-anchor="middle"');
+    z+=T(848,yv+4,'VCC')+T(848,yt+4,'TRIG')+T(848,ye+4,'ECHO')+T(848,yg+4,'GND');
+    z+=ln(`M840 ${yv}H815`,'#e02424',2.4)+v5(815,yv)+ln(`M840 ${yg}H815`,'#24262b')+gnd(815,yg);
+    z+=ln(`M660 ${yt}H840`,'#c99a00',2.6);
+    z+=ln(`M840 ${ye}H800`,'#16a05a',2.6)+zz(800,ye,750,ye,'#10131a')+ln(`M750 ${ye}H660`,'#16a05a',2.6)+dot(720,ye);
+    z+=zz(720,ye+12,720,ye+62,'#10131a')+ln(`M720 ${ye}V${ye+12}M720 ${ye+62}V${ye+70}`,'#10131a',2)+gnd(720,ye+70);
+    z+=B(775,ye-12,`${rA} 1 kΩ`,'text-anchor="middle"')+B(732,ye+42,`${rB} 2 kΩ`)+`<text x="712" y="${ye-10}" text-anchor="end" style="${F};font-size:13.5px;font-weight:700;fill:#0a5a32">${J}</text>`+T(732,ye+58,'≈ 3,3 V');
+  }
+  document.getElementById('sch').innerHTML=z;
+}
+}
+</script>
+</body>
+</html>
