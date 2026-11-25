@@ -1,0 +1,13 @@
+{
+  "name": "my-parking-ponte-serial",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ponte Bluetooth/USB entre o ESP32 da cancela e a API do MY Service Parking",
+  "main": "ponte.js",
+  "scripts": {
+    "start": "node ponte.js"
+  },
+  "dependencies": {
+    "serialport": "^12.0.0"
+  }
+}

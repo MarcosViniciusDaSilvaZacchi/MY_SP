@@ -11,6 +11,8 @@
 //       LIMIAR_PRESENCA_CM = carro parado na faixa → evento VEICULO_DETECTADO.
 //    2. A cada 500 ms o ESP32 faz POST /dispositivos/<id>/sync no API Gateway:
 //       envia o estado (cancela + sensores) e recebe o próximo comando.
+//       (Nos modos Bluetooth/USB quem faz o POST é a ponte do notebook,
+//       iot/ponte-serial/ponte.js; o ESP32 só manda o estado pelo link.)
 //    3. O operador registra a entrada (ou conclui a saída com pagamento) no
 //       sistema → o estacionamento-service cria o comando ABRIR → o ESP32
 //       recebe no próximo sync e levanta a cancela.
@@ -27,13 +29,36 @@
 //  Ligações: veja iot/README.md (os pinos ECHO precisam de divisor de tensão!).
 // ════════════════════════════════════════════════════════════════════
 
-#include <WiFi.h>
-#include <HTTPClient.h>
-#include <ArduinoJson.h>
-#include <ESP32Servo.h>
 #include "config.h"
 
-#define FIRMWARE_VERSAO "1.0.0"
+// Como o ESP32 conversa com o sistema (defina CONEXAO no config.h):
+//   CONEXAO_WIFI      → HTTP direto no API Gateway (precisa de rede Wi-Fi)
+//   CONEXAO_BLUETOOTH → Bluetooth Clássico (SPP) com o notebook; a ponte
+//                       iot/ponte-serial/ponte.js repassa tudo para a API
+//   CONEXAO_USB       → mesmo protocolo da ponte, pelo cabo USB
+#define CONEXAO_WIFI      0
+#define CONEXAO_BLUETOOTH 1
+#define CONEXAO_USB       2
+#ifndef CONEXAO
+#define CONEXAO CONEXAO_WIFI   // config.h antigo (só Wi-Fi)
+#endif
+
+#if CONEXAO == CONEXAO_WIFI
+#include <WiFi.h>
+#include <HTTPClient.h>
+#elif CONEXAO == CONEXAO_BLUETOOTH
+#include <BluetoothSerial.h>
+#if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED) || !defined(CONFIG_BT_SPP_ENABLED)
+#error "Bluetooth Classico indisponivel nesta placa (ESP32-S2/S3/C3 nao tem SPP). Use CONEXAO_USB ou CONEXAO_WIFI."
+#endif
+#ifndef BT_NOME
+#define BT_NOME "MY-Parking-Cancela"
+#endif
+#endif
+#include <ArduinoJson.h>
+#include <ESP32Servo.h>
+
+#define FIRMWARE_VERSAO "1.1.0"
 
 // ── Pinos ───────────────────────────────────────────────────────────
 const int PINO_SERVO        = 13;
@@ -121,6 +146,8 @@ struct Snapshot {
   float distancia[2];
   bool presenca[2];
 } snapshot;
+
+void lerComandoBancada(char c);
 
 // ════════════════════════════════════════════════════════════════════
 //  Utilidades
@@ -301,9 +328,46 @@ void executarComando(const Comando& c) {
   }
 }
 
+// Estado no formato do /sync (o mesmo para Wi-Fi e para a ponte)
+void montarEstado(JsonDocument& doc) {
+  Snapshot s;
+  portENTER_CRITICAL(&trava);
+  s = snapshot;
+  portEXIT_CRITICAL(&trava);
+
+  doc["firmware"] = FIRMWARE_VERSAO;
+  doc["cancela"] = NOME_ESTADO[s.estado];
+  for (int i = 0; i < 2; i++) {
+    JsonObject sensor = doc["sensores"][NOME_FAIXA[i]].to<JsonObject>();
+    if (s.distancia[i] >= 0) sensor["distanciaCm"] = roundf(s.distancia[i] * 10) / 10;
+    else sensor["distanciaCm"] = nullptr;
+    sensor["presenca"] = s.presenca[i];
+  }
+}
+
+void montarEvento(JsonDocument& doc, const Evento& e) {
+  doc["tipo"] = e.tipo;
+  if (e.sentido[0]) doc["sentido"] = e.sentido;
+  if (e.distanciaCm >= 0) doc["distanciaCm"] = roundf(e.distanciaCm * 10) / 10;
+  if (e.comandoId[0]) doc["comandoId"] = e.comandoId;
+  if (e.detalhe[0]) doc["detalhe"] = e.detalhe;
+}
+
+void enfileirarComando(JsonVariantConst c) {
+  if (c.isNull()) return;
+  Comando cmd;
+  copiar(cmd.id, c["id"] | "", sizeof(cmd.id));
+  copiar(cmd.acao, c["acao"] | "", sizeof(cmd.acao));
+  copiar(cmd.sentido, c["sentido"] | "", sizeof(cmd.sentido));
+  if (cmd.id[0]) xQueueSend(filaComandos, &cmd, 0);
+}
+
+#if CONEXAO == CONEXAO_WIFI
 // ════════════════════════════════════════════════════════════════════
 //  Rede (tarefa no núcleo 0): Wi-Fi, sync e envio de eventos
 // ════════════════════════════════════════════════════════════════════
+bool linkOk() { return WiFi.status() == WL_CONNECTED; }
+
 int postJson(const String& url, const String& corpo, String& resposta) {
   HTTPClient http;
   http.setConnectTimeout(HTTP_TIMEOUT_MS);
@@ -332,11 +396,7 @@ void enviarEventosPendentes() {
   Evento e;
   while (xQueuePeek(filaEventos, &e, 0) == pdTRUE) {
     JsonDocument doc;
-    doc["tipo"] = e.tipo;
-    if (e.sentido[0]) doc["sentido"] = e.sentido;
-    if (e.distanciaCm >= 0) doc["distanciaCm"] = roundf(e.distanciaCm * 10) / 10;
-    if (e.comandoId[0]) doc["comandoId"] = e.comandoId;
-    if (e.detalhe[0]) doc["detalhe"] = e.detalhe;
+    montarEvento(doc, e);
     String corpo, resposta;
     serializeJson(doc, corpo);
 
@@ -348,22 +408,10 @@ void enviarEventosPendentes() {
 }
 
 void sincronizar() {
-  Snapshot s;
-  portENTER_CRITICAL(&trava);
-  s = snapshot;
-  portEXIT_CRITICAL(&trava);
-
   JsonDocument doc;
-  doc["firmware"] = FIRMWARE_VERSAO;
+  montarEstado(doc);
   doc["ip"] = WiFi.localIP().toString();
   doc["rssi"] = WiFi.RSSI();
-  doc["cancela"] = NOME_ESTADO[s.estado];
-  for (int i = 0; i < 2; i++) {
-    JsonObject sensor = doc["sensores"][NOME_FAIXA[i]].to<JsonObject>();
-    if (s.distancia[i] >= 0) sensor["distanciaCm"] = roundf(s.distancia[i] * 10) / 10;
-    else sensor["distanciaCm"] = nullptr;
-    sensor["presenca"] = s.presenca[i];
-  }
   String corpo, resposta;
   serializeJson(doc, corpo);
 
@@ -375,14 +423,11 @@ void sincronizar() {
 
   JsonDocument r;
   if (deserializeJson(r, resposta)) return;
-  JsonVariant c = r["comando"];
-  if (c.isNull()) return;
+  enfileirarComando(r["comando"]);
+}
 
-  Comando cmd;
-  copiar(cmd.id, c["id"] | "", sizeof(cmd.id));
-  copiar(cmd.acao, c["acao"] | "", sizeof(cmd.acao));
-  copiar(cmd.sentido, c["sentido"] | "", sizeof(cmd.sentido));
-  if (cmd.id[0]) xQueueSend(filaComandos, &cmd, 0);
+void iniciarConexao() {
+  WiFi.mode(WIFI_STA);
 }
 
 void tarefaRede(void*) {
@@ -400,28 +445,173 @@ void tarefaRede(void*) {
   }
 }
 
+#else
+// ════════════════════════════════════════════════════════════════════
+//  Link serial com a ponte do notebook (Bluetooth SPP ou cabo USB)
+//
+//  Uma mensagem JSON por linha.
+//  ESP32 → ponte:
+//    {"t":"estado","boot":N,"firmware":..,"cancela":..,"sensores":{..}}  a cada 500 ms
+//    {"t":"evento","boot":N,"seq":K,"tipo":..,"sentido":..,...}          reenviado até o ack
+//  Ponte → ESP32:
+//    {"t":"ack","seq":K}                     evento K recebido
+//    {"t":"cmd","id":..,"acao":..,"sentido":..}  comando vindo do sistema
+//    {"t":"status","servidor":true|false}    resultado do último sync na API
+//  Linhas que não começam com "{" são ignoradas pela ponte (logs).
+// ════════════════════════════════════════════════════════════════════
+#if CONEXAO == CONEXAO_BLUETOOTH
+BluetoothSerial SerialBT;
+Stream& canal = SerialBT;
+#else
+Stream& canal = Serial;
+#endif
+
+const unsigned long INTERVALO_REENVIO_EVENTO_MS = 1000;
+const unsigned long TEMPO_SEM_PONTE_MS = 3000;  // sem "status" há 3 s = ponte fora
+
+uint32_t bootId = 0;                 // muda a cada reinício: a ponte não confunde os seq
+uint32_t seqEvento = 1;              // seq do evento na cabeça da fila
+volatile unsigned long ultimoStatusMs = 0;
+SemaphoreHandle_t travaLink;         // Serial é usado pelos logs e pelo protocolo no modo USB
+
+bool linkOk() {
+  unsigned long ultimo = ultimoStatusMs;
+  return ultimo != 0 && millis() - ultimo < TEMPO_SEM_PONTE_MS;
+}
+
+void enviarLinha(JsonDocument& doc) {
+  String linha;
+  serializeJson(doc, linha);
+  linha += '\n';
+  xSemaphoreTake(travaLink, portMAX_DELAY);
+  canal.write((const uint8_t*)linha.c_str(), linha.length());  // uma escrita só: não mistura com logs
+  xSemaphoreGive(travaLink);
+}
+
+void tratarLinha(const char* linha) {
+  JsonDocument doc;
+  if (deserializeJson(doc, linha)) return;
+  const char* t = doc["t"] | "";
+
+  if (strcmp(t, "status") == 0) {
+    ultimoStatusMs = millis();
+    bool ok = doc["servidor"] | false;
+    if (ok != servidorOk) Serial.printf("[ponte] sistema %s\n", ok ? "conectado" : "indisponivel");
+    servidorOk = ok;
+  } else if (strcmp(t, "ack") == 0) {
+    if ((doc["seq"] | 0u) == seqEvento) {
+      Evento e;
+      xQueueReceive(filaEventos, &e, 0);
+      seqEvento++;
+    }
+  } else if (strcmp(t, "cmd") == 0) {
+    enfileirarComando(doc.as<JsonVariantConst>());
+  }
+}
+
+void lerLink() {
+  static char buffer[256];
+  static size_t tamanho = 0;
+  while (canal.available()) {
+    char c = canal.read();
+    if (c == '\r') continue;
+    if (c == '\n') {
+      buffer[tamanho] = '\0';
+      if (tamanho > 0 && buffer[0] == '{') tratarLinha(buffer);
+#if CONEXAO == CONEXAO_USB
+      // No modo USB o Monitor Serial e a ponte usam a mesma porta: aceita os
+      // comandos de bancada (e, s, f, d) digitados numa linha.
+      else if (tamanho == 1) lerComandoBancada(buffer[0]);
+#endif
+      tamanho = 0;
+    } else if (tamanho < sizeof(buffer) - 1) {
+      buffer[tamanho++] = c;
+    } else {
+      tamanho = 0;  // linha grande demais: descarta
+    }
+  }
+}
+
+void enviarEventoPendente() {
+  static uint32_t ultimoSeqEnviado = 0;
+  static unsigned long ultimoEnvioMs = 0;
+  Evento e;
+  if (xQueuePeek(filaEventos, &e, 0) != pdTRUE) return;
+  if (seqEvento == ultimoSeqEnviado && millis() - ultimoEnvioMs < INTERVALO_REENVIO_EVENTO_MS) return;
+  ultimoSeqEnviado = seqEvento;
+  ultimoEnvioMs = millis();
+
+  JsonDocument doc;
+  doc["t"] = "evento";
+  doc["boot"] = bootId;
+  doc["seq"] = seqEvento;
+  montarEvento(doc, e);
+  enviarLinha(doc);
+}
+
+void enviarEstado() {
+  JsonDocument doc;
+  doc["t"] = "estado";
+  doc["boot"] = bootId;
+  montarEstado(doc);
+  enviarLinha(doc);
+}
+
+void iniciarConexao() {
+  travaLink = xSemaphoreCreateMutex();
+  bootId = esp_random();
+#if CONEXAO == CONEXAO_BLUETOOTH
+  if (!SerialBT.begin(BT_NOME)) {
+    Serial.println("[bluetooth] falha ao iniciar o Bluetooth");
+  } else {
+    Serial.printf("[bluetooth] visivel como \"%s\": pareie no notebook e rode a ponte\n", BT_NOME);
+  }
+#endif
+}
+
+void tarefaRede(void*) {
+  unsigned long ultimoEstado = 0;
+  bool linkAnterior = false;
+  for (;;) {
+    lerLink();
+    bool ok = linkOk();
+    if (!ok) servidorOk = false;
+    if (ok != linkAnterior) {
+      Serial.printf("[ponte] %s\n", ok ? "conectada" : "desconectada");
+      linkAnterior = ok;
+    }
+    enviarEventoPendente();
+    if (millis() - ultimoEstado >= INTERVALO_SYNC_MS) {
+      ultimoEstado = millis();
+      enviarEstado();
+    }
+    vTaskDelay(pdMS_TO_TICKS(20));
+  }
+}
+#endif
+
 // ════════════════════════════════════════════════════════════════════
 //  LED de status e comandos pelo Serial (teste de bancada)
 // ════════════════════════════════════════════════════════════════════
 void atualizarLed(unsigned long agora) {
-  // aceso = tudo ok | pisca devagar = Wi-Fi ok, servidor fora | pisca rápido = sem Wi-Fi
+  // aceso = tudo ok | pisca devagar = Wi-Fi/ponte ok, sistema fora | pisca rápido = sem Wi-Fi/ponte
   if (servidorOk) { digitalWrite(PINO_LED, HIGH); return; }
-  unsigned long periodo = WiFi.status() == WL_CONNECTED ? 1000 : 200;
+  unsigned long periodo = linkOk() ? 1000 : 200;
   digitalWrite(PINO_LED, (agora / periodo) % 2);
 }
 
-void lerSerial() {
-  if (!Serial.available()) return;
-  char c = Serial.read();
+void lerComandoBancada(char c) {
   static unsigned long seq = 0;
   char id[24];
   snprintf(id, sizeof(id), "serial-%lu", ++seq);
   Comando cmd;
   copiar(cmd.id, id, sizeof(cmd.id));
+  // Vai pela fila de comandos: no modo USB esta função roda na tarefa de rede,
+  // e só o loop() mexe na cancela.
   switch (c) {
-    case 'e': copiar(cmd.acao, "ABRIR", 8); copiar(cmd.sentido, "ENTRADA", 8); executarComando(cmd); break;
-    case 's': copiar(cmd.acao, "ABRIR", 8); copiar(cmd.sentido, "SAIDA", 8); executarComando(cmd); break;
-    case 'f': copiar(cmd.acao, "FECHAR", 8); copiar(cmd.sentido, "ENTRADA", 8); executarComando(cmd); break;
+    case 'e': copiar(cmd.acao, "ABRIR", 8); copiar(cmd.sentido, "ENTRADA", 8); xQueueSend(filaComandos, &cmd, 0); break;
+    case 's': copiar(cmd.acao, "ABRIR", 8); copiar(cmd.sentido, "SAIDA", 8); xQueueSend(filaComandos, &cmd, 0); break;
+    case 'f': copiar(cmd.acao, "FECHAR", 8); copiar(cmd.sentido, "ENTRADA", 8); xQueueSend(filaComandos, &cmd, 0); break;
     case 'd':
       Serial.printf("[sensores] entrada %.1f cm (%s) | saida %.1f cm (%s) | cancela %s | servidor %s\n",
         sensores[ENTRADA].distanciaCm, sensores[ENTRADA].presenca ? "carro" : "livre",
@@ -432,6 +622,12 @@ void lerSerial() {
   }
 }
 
+void lerSerial() {
+#if CONEXAO != CONEXAO_USB   // no modo USB quem lê o Serial é a tarefa de rede (lerLink)
+  while (Serial.available()) lerComandoBancada(Serial.read());
+#endif
+}
+
 // ════════════════════════════════════════════════════════════════════
 //  setup / loop (núcleo 1): sensores, servo e máquina de estados
 // ════════════════════════════════════════════════════════════════════
@@ -439,6 +635,8 @@ void setup() {
   Serial.begin(115200);
   delay(200);
   Serial.println("\n=== MY Parking — cancela ESP32 v" FIRMWARE_VERSAO " ===");
+  const char* NOME_CONEXAO[] = { "Wi-Fi", "Bluetooth (ponte no notebook)", "USB (ponte no notebook)" };
+  Serial.printf("Conexao: %s\n", NOME_CONEXAO[CONEXAO]);
   Serial.println("Serial: e = abrir entrada | s = abrir saida | f = fechar | d = diagnostico");
 
   pinMode(PINO_LED, OUTPUT);
@@ -457,7 +655,7 @@ void setup() {
   filaComandos = xQueueCreate(4, sizeof(Comando));
   atualizarSnapshot();
 
-  WiFi.mode(WIFI_STA);
+  iniciarConexao();
   xTaskCreatePinnedToCore(tarefaRede, "rede", 8192, nullptr, 1, nullptr, 0);
 }
 

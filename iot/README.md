@@ -38,6 +38,26 @@ Regras da cancela (firmware e simulador):
 
 O ESP32 sempre inicia a conversa (HTTP, pelo API Gateway). Assim ele funciona atrás de qualquer roteador, sem abrir portas no ESP32.
 
+### Formas de conexão (`CONEXAO` no `config.h`)
+
+| Modo | Como chega no sistema | Quando usar |
+| :--- | :--- | :--- |
+| `CONEXAO_BLUETOOTH` (padrão) | ESP32 ⇄ Bluetooth ⇄ **ponte** no notebook ⇄ API | Demonstração: não depende de rede Wi-Fi |
+| `CONEXAO_USB` | ESP32 ⇄ cabo USB ⇄ **ponte** ⇄ API | Plano B se o Bluetooth falhar |
+| `CONEXAO_WIFI` | ESP32 ⇄ Wi-Fi ⇄ API (HTTP direto) | Quando há rede 2,4 GHz e o firewall liberado |
+
+Nos modos Bluetooth e USB, a ponte (`iot/ponte-serial/ponte.js`) faz as mesmas chamadas HTTP que o firmware Wi-Fi faria. Para o sistema não há diferença: a tela **Automação** mostra o dispositivo online com o IP `bluetooth/usb COMx`.
+
+```
+ ESP32 ──{"t":"estado"} a cada 500 ms──► ponte ──POST /sync──────► API Gateway
+       ──{"t":"evento", seq}─────────► ponte ──POST /eventos───►
+       ◄──{"t":"ack", seq}──────────── ponte
+       ◄──{"t":"cmd", id, acao, sentido}── ponte ◄── comando da resposta do /sync
+       ◄──{"t":"status", servidor}──── ponte (a cada sync: o LED mostra se o sistema respondeu)
+```
+
+Uma mensagem JSON por linha. O ESP32 reenvia o evento a cada 1 s até receber o `ack`, e a ponte descarta repetidos. Linhas que não são JSON (logs) aparecem na ponte como `[esp32] ...`.
+
 ## 2. Ligações
 
 | Componente | Pino do componente | Liga em |
@@ -64,15 +84,44 @@ O ESP32 sempre inicia a conversa (HTTP, pelo API Gateway). Assim ele funciona at
 1. Instale o pacote de placas **esp32** (Espressif) e escolha a placa **ESP32 Dev Module**.
 2. Em *Gerenciar Bibliotecas*, instale **ArduinoJson** (v7) e **ESP32Servo**.
 3. Abra `iot/esp32-cancela/esp32-cancela.ino`.
-4. Copie `config.example.h` para `config.h` e preencha:
+4. Copie `config.example.h` para `config.h`, escolha a `CONEXAO` (veja a seção 3.1 para Bluetooth) e, se for Wi-Fi, preencha:
    - `WIFI_SSID` e `WIFI_PASS` (rede **2,4 GHz**);
    - `API_BASE`: `http://<IP do PC>:3000/api`. Veja o IP com `ipconfig` no Windows. Nunca use `localhost`, porque para o ESP32 isso é ele mesmo;
    - `DEVICE_KEY` igual à `DEVICE_API_KEY` do sistema (padrão: `my-parking-esp32-key`).
-5. Grave e abra o Monitor Serial em **115200**.
+5. No modo Bluetooth, em *Ferramentas → Partition Scheme*, escolha **Huge APP (3MB No OTA)**: o Bluetooth não cabe na partição padrão com folga. (O PlatformIO já faz isso pelo `platformio.ini`.)
+6. Grave e abra o Monitor Serial em **115200**.
 
 O `config.h` está no `.gitignore` para a senha do Wi-Fi não ir para o GitHub.
 
-**LED azul da placa:** aceso = conectado ao sistema · pisca devagar = Wi-Fi ok, sistema fora · pisca rápido = sem Wi-Fi.
+**LED azul da placa:** aceso = conectado ao sistema · pisca devagar = Wi-Fi/ponte ok, sistema fora · pisca rápido = sem Wi-Fi/ponte.
+
+### 3.1 Conectando por Bluetooth no notebook
+
+Precisa de um ESP32 "clássico" (ESP32 DevKit / WROOM-32). ESP32-S2, S3 e C3 não têm Bluetooth Clássico: neles use `CONEXAO_USB`.
+
+1. Grave o firmware com `#define CONEXAO CONEXAO_BLUETOOTH` no `config.h`. O Monitor Serial mostra `[bluetooth] visivel como "MY-Parking-Cancela"`.
+2. No Windows: *Configurações → Bluetooth e dispositivos → Adicionar dispositivo → Bluetooth* e escolha **MY-Parking-Cancela** (sem PIN). O Windows cria duas portas COM para ele; a ponte acha a certa sozinha.
+3. Instale a dependência da ponte (uma vez só):
+   ```bash
+   npm run ponte:instalar
+   ```
+4. Com o sistema rodando (`npm start`), em outro terminal:
+   ```bash
+   npm run ponte
+   ```
+   Deve aparecer `ESP32 conectado em COMx` e `Sistema conectado`. O LED azul fica aceso e a tela **Automação** mostra o dispositivo online.
+
+Comandos úteis:
+
+- `npm run ponte -- --listar` mostra as portas COM e a que dispositivo Bluetooth cada uma pertence.
+- `npm run ponte -- --porta COM7` força uma porta (por exemplo, se você mudou o `BT_NOME`).
+- **Plano B (cabo USB):** grave com `CONEXAO_USB` e rode `npm run ponte -- --usb` (ou `--porta COM5`, a porta que aparece no `--listar` como USB-serial). Feche o Monitor Serial antes: só um programa abre a porta por vez. Os comandos de bancada (`e`, `s`, `f`, `d`) continuam valendo no Monitor Serial quando a ponte não está aberta.
+
+Problemas comuns:
+
+- *"Não abriu COMx: Unknown error code 121"*: a porta é de outro aparelho pareado (fone, celular) ou o ESP32 está desligado / fora de alcance. Confira com `--listar`.
+- *ESP32 não aparece na busca do Windows:* ele só fica visível com o firmware Bluetooth rodando. Se você já pareou antes com outro firmware, remova o dispositivo no Windows e pareie de novo.
+- A ponte reconecta sozinha se o ESP32 reiniciar ou sair de alcance. Enquanto o link está fora, a cancela segue as regras locais (fecha sozinha e não abre sem ordem do sistema).
 
 **Teste de bancada pelo Monitor Serial:** `e` abre para a entrada, `s` abre para a saída, `f` fecha e `d` mostra as distâncias medidas. Use o `d` para calibrar o limiar.
 

@@ -11,6 +11,8 @@
     "test": "jest",
     "test:e2e": "node tests/e2e/fluxo-completo.js",
     "simulador": "node iot/simulador/simulador-esp32.js",
+    "ponte": "node iot/ponte-serial/ponte.js",
+    "ponte:instalar": "npm install --prefix iot/ponte-serial",
     "test:e2e:iot": "node tests/e2e/automacao-cancela.js"
   },
   "devDependencies": {
