@@ -1,0 +1,489 @@
+<title>Ligações da Cancela</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: coluna única de leitura; figuras largas rolam dentro do próprio quadro no celular. */
+:root {
+  --bg: #f1f3f6; --surface: #ffffff; --fg: #1b222a; --muted: #5b6774; --line: #d6dce3;
+  --accent: #1f5fbf; --warn: #a24a07; --warn-bg: #fff3e3;
+  --board: #e7eaee; --board-edge: #bcc4cd; --plate: #cfd5dc; --hole: #66707b; --board-ink: #1f262e; --groove: #d3d8de;
+  --casing: rgba(255,255,255,.95);
+  --w5: #d62828; --wgnd: #24292e; --wtrig: #e3a400; --wecho: #23994a; --wsig: #f07f00; --wbrown: #7b4a28;
+  --f-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11151a; --surface: #192028; --fg: #e3e8ee; --muted: #9ba7b3; --line: #2b343e;
+  --accent: #82b2ff; --warn: #f3a25b; --warn-bg: #2a1e12;
+  --board: #cdd3d9; --board-edge: #9aa4ae; --plate: #a8b1bb; --hole: #58626d; --groove: #bcc3ca;
+  --casing: #a3adb8; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #11151a; --surface: #192028; --fg: #e3e8ee; --muted: #9ba7b3; --line: #2b343e;
+  --accent: #82b2ff; --warn: #f3a25b; --warn-bg: #2a1e12;
+  --board: #cdd3d9; --board-edge: #9aa4ae; --plate: #a8b1bb; --hole: #58626d; --groove: #bcc3ca;
+  --casing: #a3adb8; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--f-body); }
+.wrap { max-width: 1040px; margin: 0 auto; padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 36px; }
+header { display: grid; gap: 8px; }
+.eyebrow { font: 600 12px/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font: 700 clamp(28px, 4.5vw, 40px)/1.1 var(--f-display); margin: 0; text-wrap: balance; }
+h2 { font: 700 21px/1.25 var(--f-display); margin: 0; text-wrap: balance; }
+.lede { margin: 0; max-width: 68ch; color: var(--muted); }
+section { display: grid; gap: 14px; }
+section > p { margin: 0; max-width: 70ch; }
+code, .mono { font-family: var(--f-mono); font-size: .92em; }
+
+.facts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.fact { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font-size: 13.5px; }
+.fact b { font-family: var(--f-mono); font-weight: 600; }
+
+.warn { background: var(--warn-bg); border-left: 4px solid var(--warn); border-radius: 4px; padding: 14px 18px; display: grid; gap: 6px; }
+.warn h2 { font-size: 17px; color: var(--warn); }
+.warn ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+
+figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.scroll { overflow-x: auto; padding: 14px; }
+figure svg { display: block; width: 100%; height: auto; }
+.f1 svg { min-width: 760px; }
+.f2 svg { min-width: 620px; max-width: 760px; }
+.f3 svg { min-width: 680px; max-width: 900px; }
+figcaption { padding: 10px 16px 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13.5px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 0 16px 14px; font-size: 13px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.sw { display: inline-block; width: 18px; height: 5px; border-radius: 3px; }
+.sw.v5 { background: var(--w5); } .sw.gnd { background: var(--wgnd); outline: 1px solid var(--casing); }
+.sw.trig { background: var(--wtrig); } .sw.echo { background: var(--wecho); } .sw.sig { background: var(--wsig); } .sw.brown { background: var(--wbrown); }
+
+ol.steps { margin: 0; padding-left: 22px; display: grid; gap: 6px; max-width: 72ch; }
+
+.tbl-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.count { font-family: var(--f-mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+button { font: 500 13px var(--f-body); color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tbl { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 14px; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+thead th { font: 600 12px var(--f-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+tr.grp th { font: 600 13px var(--f-display); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); color: var(--fg); }
+td.ck { width: 36px; } td.pl { font-family: var(--f-mono); white-space: nowrap; }
+input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+tr:has(input:checked) td:not(.ck) { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent); }
+.muted { color: var(--muted); }
+.note { font-size: 13.5px; color: var(--muted); max-width: 72ch; margin: 0; }
+
+/* ── SVG ── */
+.plate { fill: var(--plate); } .board { fill: var(--board); stroke: var(--board-edge); }
+.groove { fill: var(--groove); } .hole { fill: var(--hole); }
+.rail-pos { stroke: #d62828; stroke-width: 2.5; } .rail-neg { stroke: #2563c9; stroke-width: 2.5; }
+.hl-echo { fill: rgba(35,153,74,.22); } .hl-junc { fill: rgba(31,95,191,.20); } .hl-gpio { fill: rgba(31,95,191,.12); stroke: rgba(31,95,191,.45); stroke-dasharray: 3 2; }
+.casing { fill: none; stroke: var(--casing); stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; }
+.w { fill: none; stroke-width: 3.8; stroke-linecap: round; stroke-linejoin: round; }
+.w.v5 { stroke: var(--w5); } .w.gnd { stroke: var(--wgnd); } .w.trig { stroke: var(--wtrig); }
+.w.echo { stroke: var(--wecho); } .w.sig { stroke: var(--wsig); } .w.brown { stroke: var(--wbrown); }
+.wend { fill: #3a4048; }
+.cable { fill: none; stroke: #2a2f35; stroke-width: 5; stroke-linecap: round; } .plug { fill: #3b4148; }
+.leg { stroke: #8d959e; stroke-width: 1.6; }
+.res { fill: #e3cfa3; stroke: #b49b68; stroke-width: .8; }
+.cap { fill: #23324d; } .cap-stripe { fill: none; stroke: #d7dde5; stroke-width: 2.5; }
+.lead { fill: none; stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.mb { fill: #23272c; } .mb-jack { fill: #111417; } .mb-hole { fill: #3a3f45; } .mb-sw { fill: #d9dde2; } .mb-swk { fill: #9aa2ab; }
+.mb-usb { fill: #b8bfc7; } .mb-usbin { fill: #4a5058; } .mb-led { fill: #33c26b; } .mb-hdr { fill: #15181b; } .mb-pin { fill: #d4b24c; }
+.mb-jmp { fill: #f3c623; opacity: .92; } .mbpin { stroke: #9aa2ab; stroke-width: 2.4; }
+.mb-t { font: 600 8.5px var(--f-mono); fill: #cfd5db; } .mb-title { font: 700 12px var(--f-display); fill: #f2f4f6; letter-spacing: .06em; }
+.esp { fill: #1b1e22; } .esp-ant { fill: #8f979f; } .esp-usb { fill: #b8bfc7; } .esp-pad { fill: #c9a94a; }
+.esp-l { font: 400 9.5px var(--f-mono); fill: #8e98a3; } .esp-on { font: 600 10px var(--f-mono); fill: #8cc4ff; }
+.esp-name { font: 600 11px var(--f-display); fill: #dfe4ea; letter-spacing: .08em; }
+.servo { fill: #2b4c8c; } .servo-horn { fill: #eef1f4; }
+.sv-t { font: 700 12px var(--f-display); fill: #ffffff; } .sv-s { font: 400 10.5px var(--f-body); fill: #cfdaf0; }
+.sr { fill: #1d5596; } .sr-t { font: 700 11px var(--f-display); fill: #ffffff; letter-spacing: .03em; }
+.sr-can { fill: #c7ced6; } .sr-mesh { fill: #50585f; } .sr-pin { fill: #c9a94a; } .sr-l { font: 600 9.5px var(--f-mono); fill: #e5ecf5; }
+.pt { font: 400 12px var(--f-body); fill: var(--fg); } .pt.b { font-weight: 600; } .pt.acc, .acc { fill: var(--accent); }
+.pm { font: 400 11px var(--f-body); fill: var(--muted); }
+.bt, .bt-s { font: 600 10px var(--f-body); fill: var(--board-ink); stroke: var(--board); stroke-width: 3; paint-order: stroke; }
+.bt-s { font-weight: 500; font-size: 9px; }
+.bt-sym { font: 700 12px var(--f-mono); fill: var(--fg); }
+.cap-board { font: 600 11px var(--f-mono); letter-spacing: .14em; fill: var(--muted); }
+.sch { fill: none; stroke: var(--fg); stroke-width: 1.6; stroke-linecap: round; }
+.sch-box { fill: var(--surface); stroke: var(--fg); stroke-width: 1.6; }
+.sch-res { fill: var(--surface); stroke: var(--fg); stroke-width: 1.6; }
+.sch-dot { fill: var(--accent); }
+.sch-t { font: 600 11px var(--f-mono); fill: var(--fg); } .sch-s { font: 400 10.5px var(--f-body); fill: var(--muted); }
+.sch-h { font: 700 13px var(--f-display); fill: var(--fg); } .sch-pin { font: 600 10.5px var(--f-mono); fill: var(--accent); }
+.sch-acc { font: 600 11px var(--f-mono); fill: var(--accent); }
+</style>
+
+<div class="wrap">
+<header>
+  <span class="eyebrow">MY Parking · maquete da portaria</span>
+  <h1>Ligações da cancela</h1>
+  <p class="lede">ESP32 DevKit V1 (30 pinos) atravessando as duas placas da protoboard Minipa MP-1680, alimentado pela MB102 numa fonte de tomada, com dois sensores HC-SR04 e o servo da cancela. Conversa com o notebook por Bluetooth, sem cabo USB.</p>
+  <div class="facts">
+    <span class="fact">Fonte <b>9 V · 1 A</b>, plug P4</span>
+    <span class="fact">Jumpers da MB102 <b>5V</b></span>
+    <span class="fact">Entrada <b>D5 / D18</b></span>
+    <span class="fact">Saída <b>D19 / D21</b></span>
+    <span class="fact">Servo <b>D13</b></span>
+  </div>
+</header>
+
+<aside class="warn" aria-label="Antes de ligar na tomada">
+  <h2>Antes de ligar na tomada</h2>
+  <ul>
+    <li><b>ECHO nunca direto no ESP32.</b> Sempre pelo divisor de 1 kΩ + 2 kΩ: o sensor manda 5 V e o pino aguenta 3,3 V.</li>
+    <li>Os <b>dois jumpers amarelos</b> da MB102 em <b>5V</b>. Nada de 5 V no pino <span class="mono">3V3</span> do ESP32.</li>
+    <li>Use fonte de <b>9 V</b>. Com 12 V o regulador da MB102 esquenta demais com o servo puxando corrente.</li>
+    <li>A MB102 só alimenta a Placa A. Sem as <b>duas pontes</b> (vermelha e preta) a Placa B fica sem energia.</li>
+  </ul>
+</aside>
+
+<section>
+  <h2>Montagem na protoboard</h2>
+  <figure class="f1">
+    <div class="scroll">
+      <svg viewBox="0 0 960 712" role="img" aria-label="Vista da protoboard MP-1680: MB102 na Placa A alimenta os trilhos, pontes levam 5V e GND à Placa B; ESP32 atravessa as duas placas; servo no D13 e trilhos da Placa A; sensores de entrada (D5, D18) e saída (D19, D21) na Placa B, cada ECHO passando por um divisor 1 kΩ/2 kΩ.">
+<defs><pattern id="pb-furos" x="161" y="159" width="18" height="18" patternUnits="userSpaceOnUse"><rect x="5.6" y="5.6" width="6.8" height="6.8" rx="1.3" class="hole"/></pattern></defs>
+<rect x="94" y="153" width="622" height="444" rx="8" class="plate"/>
+<rect x="98" y="157" width="270" height="436" rx="5" class="board"/>
+<rect x="452" y="157" width="260" height="436" rx="5" class="board"/>
+<rect x="255" y="159" width="10" height="432" class="groove"/>
+<rect x="555" y="159" width="10" height="432" class="groove"/>
+<rect x="107" y="159" width="36" height="432" fill="url(#pb-furos)"/>
+<rect x="161" y="159" width="90" height="432" fill="url(#pb-furos)"/>
+<rect x="269" y="159" width="90" height="432" fill="url(#pb-furos)"/>
+<rect x="461" y="159" width="90" height="432" fill="url(#pb-furos)"/>
+<rect x="569" y="159" width="90" height="432" fill="url(#pb-furos)"/>
+<rect x="665" y="159" width="36" height="432" fill="url(#pb-furos)"/>
+<line x1="105" y1="161" x2="105" y2="589" class="rail-pos"/>
+<line x1="145" y1="161" x2="145" y2="589" class="rail-neg"/>
+<line x1="663" y1="161" x2="663" y2="589" class="rail-neg"/>
+<line x1="703" y1="161" x2="703" y2="589" class="rail-pos"/>
+<text x="116" y="606" class="bt-sym" text-anchor="middle" >+</text><text x="134" y="606" class="bt-sym" text-anchor="middle" >−</text>
+<text x="674" y="606" class="bt-sym" text-anchor="middle" >−</text><text x="692" y="606" class="bt-sym" text-anchor="middle" >+</text>
+<rect x="570" y="250.5" width="88" height="15" rx="3" class="hl-echo"/><rect x="570" y="304.5" width="88" height="15" rx="3" class="hl-junc"/><rect x="570" y="466.5" width="88" height="15" rx="3" class="hl-echo"/><rect x="570" y="412.5" width="88" height="15" rx="3" class="hl-junc"/>
+<line x1="116" y1="148" x2="116" y2="168" class="mbpin"/><line x1="134" y1="148" x2="134" y2="168" class="mbpin"/>
+<rect x="104" y="72" width="266" height="78" rx="4" class="mb"/>
+<rect x="110" y="88" width="36" height="34" rx="3" class="mb-jack"/><circle cx="128" cy="105" r="7" class="mb-hole"/>
+<rect x="156" y="92" width="18" height="26" rx="2" class="mb-sw"/><rect x="159" y="96" width="12" height="10" rx="1" class="mb-swk"/>
+<rect x="184" y="84" width="40" height="34" rx="2" class="mb-usb"/><rect x="190" y="96" width="28" height="10" class="mb-usbin"/>
+<circle cx="236" cy="131" r="4" class="mb-led"/>
+<rect x="258" y="88" width="48" height="16" rx="2" class="mb-hdr"/>
+<circle cx="266" cy="96" r="2.4" class="mb-pin"/>
+<circle cx="282" cy="96" r="2.4" class="mb-pin"/>
+<circle cx="298" cy="96" r="2.4" class="mb-pin"/>
+<rect x="260" y="89" width="28" height="14" rx="2" class="mb-jmp"/>
+<text x="274" y="117" class="mb-t" text-anchor="middle" >jumper em 5V</text>
+<rect x="314" y="88" width="48" height="16" rx="2" class="mb-hdr"/>
+<circle cx="322" cy="96" r="2.4" class="mb-pin"/>
+<circle cx="338" cy="96" r="2.4" class="mb-pin"/>
+<circle cx="354" cy="96" r="2.4" class="mb-pin"/>
+<rect x="316" y="89" width="28" height="14" rx="2" class="mb-jmp"/>
+<text x="330" y="117" class="mb-t" text-anchor="middle" >jumper em 5V</text>
+<text x="296" y="140" class="mb-title" text-anchor="middle" >MB102</text>
+<path d="M8 105 H92" class="casing"/><path d="M8 105 H92" class="cable"/><rect x="88" y="99" width="22" height="12" rx="2" class="plug"/>
+<text x="8" y="46" class="pt b" text-anchor="start" >Fonte de tomada</text><text x="8" y="61" class="pt" text-anchor="start" >9 V · 1 A · plug P4</text>
+<text x="380" y="92" class="pt b" text-anchor="start" >Os 2 jumpers amarelos</text><text x="380" y="107" class="pt" text-anchor="start" >na posição 5V</text>
+<path d="M378 98 H362" class="lead"/>
+<path d="M116 186 H692" class="casing"/><path d="M116 186 H692" class="w v5"/><circle cx="116" cy="186" r="2.6" class="wend"/><circle cx="692" cy="186" r="2.6" class="wend"/>
+<path d="M134 204 H674" class="casing"/><path d="M134 204 H674" class="w gnd"/><circle cx="134" cy="204" r="2.6" class="wend"/><circle cx="674" cy="204" r="2.6" class="wend"/>
+<text x="560" y="180" class="bt" text-anchor="middle" >pontes 5V e GND → Placa B</text>
+<rect x="357" y="214" width="106" height="304" rx="4" class="esp"/>
+<rect x="372" y="218" width="76" height="16" rx="2" class="esp-ant"/>
+<rect x="396" y="516" width="28" height="14" rx="2" class="esp-usb"/>
+<text x="410" y="366" class="esp-name" text-anchor="middle" transform="rotate(-90 410 366)" dominant-baseline="middle">ESP32 DevKit V1</text>
+<rect x="346" y="236" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="362" y="243.5" class="esp-l" text-anchor="start" >EN</text>
+<rect x="346" y="254" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="362" y="261.5" class="esp-l" text-anchor="start" >VP</text>
+<rect x="346" y="272" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="362" y="279.5" class="esp-l" text-anchor="start" >VN</text>
+<rect x="346" y="290" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="362" y="297.5" class="esp-l" text-anchor="start" >D34</text>
+<rect x="346" y="308" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="362" y="315.5" class="esp-l" text-anchor="start" >D35</text>
+<rect x="346" y="326" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="362" y="333.5" class="esp-l" text-anchor="start" >D32</text>
+<rect x="346" y="344" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="362" y="351.5" class="esp-l" text-anchor="start" >D33</text>
+<rect x="346" y="362" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="362" y="369.5" class="esp-l" text-anchor="start" >D25</text>
+<rect x="346" y="380" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="362" y="387.5" class="esp-l" text-anchor="start" >D26</text>
+<rect x="346" y="398" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="362" y="405.5" class="esp-l" text-anchor="start" >D27</text>
+<rect x="346" y="416" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="362" y="423.5" class="esp-l" text-anchor="start" >D14</text>
+<rect x="346" y="434" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="362" y="441.5" class="esp-l" text-anchor="start" >D12</text>
+<rect x="346" y="452" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="362" y="459.5" class="esp-on" text-anchor="start" >D13</text>
+<rect x="346" y="470" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="362" y="477.5" class="esp-on" text-anchor="start" >GND</text>
+<rect x="346" y="488" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="362" y="495.5" class="esp-on" text-anchor="start" >VIN</text>
+<rect x="466" y="236" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="458" y="243.5" class="esp-l" text-anchor="end" >D23</text>
+<rect x="466" y="254" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="458" y="261.5" class="esp-l" text-anchor="end" >D22</text>
+<rect x="466" y="272" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="458" y="279.5" class="esp-l" text-anchor="end" >TX0</text>
+<rect x="466" y="290" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="458" y="297.5" class="esp-l" text-anchor="end" >RX0</text>
+<rect x="466" y="308" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="458" y="315.5" class="esp-on" text-anchor="end" >D21</text>
+<rect x="466" y="326" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="458" y="333.5" class="esp-on" text-anchor="end" >D19</text>
+<rect x="466" y="344" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="458" y="351.5" class="esp-on" text-anchor="end" >D18</text>
+<rect x="466" y="362" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="458" y="369.5" class="esp-on" text-anchor="end" >D5</text>
+<rect x="466" y="380" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="458" y="387.5" class="esp-l" text-anchor="end" >TX2</text>
+<rect x="466" y="398" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="458" y="405.5" class="esp-l" text-anchor="end" >RX2</text>
+<rect x="466" y="416" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="458" y="423.5" class="esp-l" text-anchor="end" >D4</text>
+<rect x="466" y="434" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="458" y="441.5" class="esp-l" text-anchor="end" >D2</text>
+<rect x="466" y="452" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="458" y="459.5" class="esp-l" text-anchor="end" >D15</text>
+<rect x="466" y="470" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="458" y="477.5" class="esp-l" text-anchor="end" >GND</text>
+<rect x="466" y="488" width="8" height="8" rx="1" class="esp-pad"/>
+<text x="458" y="495.5" class="esp-l" text-anchor="end" >3V3</text>
+<path d="M278 492 H116" class="casing"/><path d="M278 492 H116" class="w v5"/><circle cx="278" cy="492" r="2.6" class="wend"/><circle cx="116" cy="492" r="2.6" class="wend"/>
+<path d="M278 474 H134" class="casing"/><path d="M278 474 H134" class="w gnd"/><circle cx="278" cy="474" r="2.6" class="wend"/><circle cx="134" cy="474" r="2.6" class="wend"/>
+<path d="M332 456 V640" class="casing"/><path d="M332 456 V640" class="w sig"/><circle cx="332" cy="456" r="2.6" class="wend"/>
+<path d="M250 662 H134 V582" class="casing"/><path d="M250 662 H134 V582" class="w brown"/><circle cx="134" cy="582" r="2.6" class="wend"/>
+<path d="M250 680 H116 V564" class="casing"/><path d="M250 680 H116 V564" class="w v5"/><circle cx="116" cy="564" r="2.6" class="wend"/>
+<rect x="236" y="663" width="188" height="14" rx="3" class="servo"/><rect x="250" y="640" width="160" height="60" rx="6" class="servo"/>
+<circle cx="384" cy="670" r="12" class="servo-horn"/><rect x="380" y="642" width="8" height="40" rx="4" class="servo-horn"/>
+<text x="262" y="666" class="sv-t" text-anchor="start" >Servo SG90</text><text x="262" y="682" class="sv-s" text-anchor="start" >cancela</text>
+<line x1="116" y1="528" x2="125" y2="533" class="leg"/><line x1="134" y1="546" x2="125" y2="541" class="leg"/>
+<circle cx="125" cy="537" r="10" class="cap"/><path d="M131 530 A10 10 0 0 1 131 544" class="cap-stripe"/>
+<circle cx="116" cy="528" r="2.6" class="wend"/><circle cx="134" cy="546" r="2.6" class="wend"/>
+<text x="90" y="532" class="pt" text-anchor="end" >C 470–1000 µF</text><text x="90" y="551" class="pm" text-anchor="end" >perna longa no +</text>
+<path d="M542 312 H578" class="casing"/><path d="M542 312 H578" class="w echo"/><circle cx="542" cy="312" r="2.6" class="wend"/><circle cx="578" cy="312" r="2.6" class="wend"/>
+<line x1="596" y1="258" x2="596" y2="312" class="leg"/><rect x="590.5" y="270" width="11" height="30" rx="4" class="res"/><rect x="590.5" y="275" width="11" height="3" fill="#7a4a2a"/><rect x="590.5" y="281" width="11" height="3" fill="#1b1b1b"/><rect x="590.5" y="287" width="11" height="3" fill="#c62828"/><circle cx="596" cy="258" r="2.6" class="wend"/><circle cx="596" cy="312" r="2.6" class="wend"/>
+<line x1="632" y1="312" x2="674" y2="312" class="leg"/><rect x="640" y="306.5" width="26" height="11" rx="4" class="res"/><rect x="644" y="306.5" width="3" height="11" fill="#c62828"/><rect x="650" y="306.5" width="3" height="11" fill="#1b1b1b"/><rect x="656" y="306.5" width="3" height="11" fill="#c62828"/><circle cx="632" cy="312" r="2.6" class="wend"/><circle cx="674" cy="312" r="2.6" class="wend"/>
+<path d="M506 348 V420 H578" class="casing"/><path d="M506 348 V420 H578" class="w echo"/><circle cx="506" cy="348" r="2.6" class="wend"/><circle cx="578" cy="420" r="2.6" class="wend"/>
+<line x1="596" y1="420" x2="596" y2="474" class="leg"/><rect x="590.5" y="432" width="11" height="30" rx="4" class="res"/><rect x="590.5" y="437" width="11" height="3" fill="#7a4a2a"/><rect x="590.5" y="443" width="11" height="3" fill="#1b1b1b"/><rect x="590.5" y="449" width="11" height="3" fill="#c62828"/><circle cx="596" cy="420" r="2.6" class="wend"/><circle cx="596" cy="474" r="2.6" class="wend"/>
+<line x1="632" y1="420" x2="674" y2="420" class="leg"/><rect x="640" y="414.5" width="26" height="11" rx="4" class="res"/><rect x="644" y="414.5" width="3" height="11" fill="#c62828"/><rect x="650" y="414.5" width="3" height="11" fill="#1b1b1b"/><rect x="656" y="414.5" width="3" height="11" fill="#c62828"/><circle cx="632" cy="420" r="2.6" class="wend"/><circle cx="674" cy="420" r="2.6" class="wend"/>
+<text x="587" y="289" class="bt" text-anchor="end" >1 kΩ</text><text x="653" y="302" class="bt" text-anchor="middle" >2 kΩ</text>
+<text x="587" y="451" class="bt" text-anchor="end" >1 kΩ</text><text x="653" y="438" class="bt" text-anchor="middle" >2 kΩ</text>
+<path d="M674 222 H740 V267 H770" class="casing"/><path d="M674 222 H740 V267 H770" class="w gnd"/><circle cx="674" cy="222" r="2.6" class="wend"/>
+<path d="M650 258 H725 V285 H770" class="casing"/><path d="M650 258 H725 V285 H770" class="w echo"/><circle cx="650" cy="258" r="2.6" class="wend"/>
+<path d="M542 330 H725 V303 H770" class="casing"/><path d="M542 330 H725 V303 H770" class="w trig"/><circle cx="542" cy="330" r="2.6" class="wend"/>
+<path d="M692 348 H740 V321 H770" class="casing"/><path d="M692 348 H740 V321 H770" class="w v5"/><circle cx="692" cy="348" r="2.6" class="wend"/>
+<path d="M692 384 H770" class="casing"/><path d="M692 384 H770" class="w v5"/><circle cx="692" cy="384" r="2.6" class="wend"/>
+<path d="M542 366 H662 V402 H770" class="casing"/><path d="M542 366 H662 V402 H770" class="w trig"/><circle cx="542" cy="366" r="2.6" class="wend"/>
+<path d="M650 474 H745 V420 H770" class="casing"/><path d="M650 474 H745 V420 H770" class="w echo"/><circle cx="650" cy="474" r="2.6" class="wend"/>
+<path d="M674 510 H755 V438 H770" class="casing"/><path d="M674 510 H755 V438 H770" class="w gnd"/><circle cx="674" cy="510" r="2.6" class="wend"/>
+<rect x="770" y="248" width="170" height="92" rx="5" class="sr"/><text x="878" y="264" class="sr-t" text-anchor="middle" >HC-SR04 · SAÍDA</text><circle cx="862" cy="302" r="18" class="sr-can"/><circle cx="862" cy="302" r="11" class="sr-mesh"/><circle cx="912" cy="302" r="18" class="sr-can"/><circle cx="912" cy="302" r="11" class="sr-mesh"/><rect x="765" y="263" width="9" height="8" rx="1" class="sr-pin"/><text x="781" y="270.5" class="sr-l" text-anchor="start" >GND</text><rect x="765" y="281" width="9" height="8" rx="1" class="sr-pin"/><text x="781" y="288.5" class="sr-l" text-anchor="start" >ECHO</text><rect x="765" y="299" width="9" height="8" rx="1" class="sr-pin"/><text x="781" y="306.5" class="sr-l" text-anchor="start" >TRIG</text><rect x="765" y="317" width="9" height="8" rx="1" class="sr-pin"/><text x="781" y="324.5" class="sr-l" text-anchor="start" >VCC</text>
+<rect x="770" y="368" width="170" height="92" rx="5" class="sr"/><text x="878" y="384" class="sr-t" text-anchor="middle" >HC-SR04 · ENTRADA</text><circle cx="862" cy="422" r="18" class="sr-can"/><circle cx="862" cy="422" r="11" class="sr-mesh"/><circle cx="912" cy="422" r="18" class="sr-can"/><circle cx="912" cy="422" r="11" class="sr-mesh"/><rect x="765" y="380" width="9" height="8" rx="1" class="sr-pin"/><text x="781" y="387.5" class="sr-l" text-anchor="start" >VCC</text><rect x="765" y="398" width="9" height="8" rx="1" class="sr-pin"/><text x="781" y="405.5" class="sr-l" text-anchor="start" >TRIG</text><rect x="765" y="416" width="9" height="8" rx="1" class="sr-pin"/><text x="781" y="423.5" class="sr-l" text-anchor="start" >ECHO</text><rect x="765" y="434" width="9" height="8" rx="1" class="sr-pin"/><text x="781" y="441.5" class="sr-l" text-anchor="start" >GND</text>
+<text x="233" y="622" class="cap-board" text-anchor="middle" >PLACA A</text><text x="582" y="622" class="cap-board" text-anchor="middle" >PLACA B</text>
+      </svg>
+    </div>
+    <div class="legend">
+      <span class="chip"><i class="sw v5"></i>5V</span>
+      <span class="chip"><i class="sw gnd"></i>GND</span>
+      <span class="chip"><i class="sw trig"></i>TRIG</span>
+      <span class="chip"><i class="sw echo"></i>ECHO e junção</span>
+      <span class="chip"><i class="sw sig"></i>sinal do servo</span>
+      <span class="chip"><i class="sw brown"></i>GND do servo</span>
+    </div>
+    <figcaption>Faixa verde: fileira do ECHO. Faixa azul: fileira da junção, que vai ao GPIO e fica em ≈ 3,3 V. O desenho está fora de escala. Os pinos do ESP32 seguem a placa de 30 pinos: se a sua for diferente, guie-se pelos nomes impressos (D5, D18…). Confira as cores dos trilhos na sua protoboard: o que importa é + com + e − com −.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>O divisor de tensão, de perto</h2>
+  <p>É a parte que ficou solta na montagem anterior. Cada sensor tem o seu: o resistor menor (1 kΩ) fica do lado do ECHO, o maior (2 kΩ) vai para o GND, e o GPIO pega o ponto do meio.</p>
+  <figure class="f2">
+    <div class="scroll">
+      <svg viewBox="0 0 680 232" role="img" aria-label="Detalhe do divisor: fio ECHO e uma perna do 1 kΩ na mesma fileira; outra perna do 1 kΩ, jumper do GPIO e perna do 2 kΩ na fileira da junção; outra perna do 2 kΩ no trilho negativo.">
+<rect x="40" y="28" width="312" height="162" rx="6" class="board"/>
+<rect x="95" y="30" width="10" height="158" class="groove"/>
+<rect x="118" y="39" width="144" height="22" rx="4" class="hl-echo"/>
+<rect x="118" y="129" width="144" height="22" rx="4" class="hl-junc"/>
+<rect x="52" y="129" width="34" height="22" rx="4" class="hl-gpio"/>
+<line x1="289" y1="34" x2="289" y2="184" class="rail-neg"/><line x1="341" y1="34" x2="341" y2="184" class="rail-pos"/>
+<rect x="66" y="46" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="126" y="46" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="156" y="46" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="186" y="46" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="216" y="46" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="246" y="46" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="296" y="46" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="326" y="46" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="66" y="76" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="126" y="76" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="156" y="76" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="186" y="76" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="216" y="76" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="246" y="76" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="296" y="76" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="326" y="76" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="66" y="106" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="126" y="106" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="156" y="106" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="186" y="106" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="216" y="106" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="246" y="106" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="296" y="106" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="326" y="106" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="66" y="136" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="126" y="136" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="156" y="136" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="186" y="136" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="216" y="136" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="246" y="136" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="296" y="136" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="326" y="136" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="66" y="166" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="126" y="166" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="156" y="166" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="186" y="166" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="216" y="166" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="246" y="166" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="296" y="166" width="8" height="8" rx="1.5" class="hole"/>
+<rect x="326" y="166" width="8" height="8" rx="1.5" class="hole"/>
+<text x="300" y="205" class="pt b" text-anchor="middle" >−</text><text x="330" y="205" class="pt b" text-anchor="middle" >+</text>
+<path d="M250 50 V8" class="casing"/><path d="M250 50 V8" class="w echo"/><circle cx="250" cy="50" r="2.6" class="wend"/>
+<text x="258" y="14" class="pt" text-anchor="start" >ECHO do sensor (5 V)</text>
+<path d="M70 140 C 70 116, 130 116, 130 140" class="casing"/><path d="M70 140 C 70 116, 130 116, 130 140" class="w echo"/><circle cx="70" cy="140" r="2.6" class="wend"/><circle cx="130" cy="140" r="2.6" class="wend"/>
+<text x="40" y="222" class="pm" text-anchor="start" >O jumper sai da fileira do pino do ESP32 (D21 na saída, D18 na entrada)</text>
+<line x1="160" y1="50" x2="160" y2="140" class="leg"/><rect x="154.5" y="80" width="11" height="30" rx="4" class="res"/><rect x="154.5" y="85" width="11" height="3" fill="#7a4a2a"/><rect x="154.5" y="91" width="11" height="3" fill="#1b1b1b"/><rect x="154.5" y="97" width="11" height="3" fill="#c62828"/><circle cx="160" cy="50" r="2.6" class="wend"/><circle cx="160" cy="140" r="2.6" class="wend"/>
+<line x1="220" y1="140" x2="300" y2="140" class="leg"/><rect x="247" y="134.5" width="26" height="11" rx="4" class="res"/><rect x="251" y="134.5" width="3" height="11" fill="#c62828"/><rect x="257" y="134.5" width="3" height="11" fill="#1b1b1b"/><rect x="263" y="134.5" width="3" height="11" fill="#c62828"/><circle cx="220" cy="140" r="2.6" class="wend"/><circle cx="300" cy="140" r="2.6" class="wend"/>
+<text x="170" y="99" class="bt" text-anchor="start" >1 kΩ</text>
+<text x="260" y="128" class="bt" text-anchor="middle" >2 kΩ</text>
+<path d="M262 50 H284" class="lead"/><path d="M350 50 H374" class="lead"/>
+<text x="380" y="48" class="pt b" text-anchor="start" >Fileira do ECHO</text><text x="380" y="64" class="pm" text-anchor="start" >fio verde do sensor + uma perna do 1 kΩ</text>
+<path d="M350 140 H374" class="lead"/>
+<text x="380" y="138" class="pt b acc" text-anchor="start" >Fileira da junção ≈ 3,3 V</text><text x="380" y="154" class="pm" text-anchor="start" >outra perna do 1 kΩ + jumper do GPIO + 2 kΩ</text>
+<text x="380" y="184" class="pm" text-anchor="start" >Outra perna do 2 kΩ direto no trilho − (GND)</text>
+      </svg>
+    </div>
+    <figcaption>5 V × 2 kΩ ÷ (1 kΩ + 2 kΩ) ≈ 3,3 V no GPIO. Sem resistor de 2 kΩ, use dois de 1 kΩ em série.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>Esquema elétrico</h2>
+  <figure class="f3">
+    <div class="scroll">
+      <svg viewBox="0 0 900 410" role="img" aria-label="Esquema elétrico: MB102 gera 5 V; ESP32 alimentado pelo VIN; servo no D13 com capacitor entre 5 V e GND; sensores com TRIG direto no D5 e D19 e ECHO por divisor 1 kΩ/2 kΩ até D18 e D21.">
+<rect x="30" y="30" width="130" height="70" rx="4" class="sch-box"/><text x="95" y="56" class="sch-h" text-anchor="middle" >MB102</text><text x="95" y="72" class="sch-s" text-anchor="middle" >entra: fonte 9 V</text><text x="95" y="87" class="sch-s" text-anchor="middle" >sai: 5 V (jumpers 5V)</text>
+<path d="M160 50 H195" class="sch"/><path d="M195 50 V34 M186 34 H204" class="sch"/><text x="195" y="28" class="sch-t" text-anchor="middle" >5V</text><path d="M160 85 H195" class="sch"/><path d="M195 85 V97 M185 97 H205 M189 102 H201 M193 107 H197" class="sch"/>
+<path d="M120 170 V154 M111 154 H129" class="sch"/><text x="120" y="148" class="sch-t" text-anchor="middle" >5V</text><path d="M120 170 V200 M108 200 H132" class="sch"/><path d="M108 210 Q120 204 132 210" class="sch"/><path d="M120 207 V250" class="sch"/><path d="M120 250 V262 M110 262 H130 M114 267 H126 M118 272 H122" class="sch"/>
+<text x="110" y="196" class="sch-t" text-anchor="end" >+</text><text x="100" y="214" class="sch-t" text-anchor="end" >C</text><text x="100" y="228" class="sch-s" text-anchor="end" >470–1000 µF</text>
+<rect x="180" y="230" width="120" height="60" rx="4" class="sch-box"/><text x="240" y="256" class="sch-h" text-anchor="middle" >Servo SG90</text><text x="240" y="272" class="sch-s" text-anchor="middle" >cancela</text>
+<path d="M210 230 V214 M201 214 H219" class="sch"/><text x="210" y="208" class="sch-t" text-anchor="middle" >5V</text><text x="216" y="226" class="sch-s" text-anchor="start" >V+</text><path d="M270 290 V302 M260 302 H280 M264 307 H276 M268 312 H272" class="sch"/>
+<path d="M300 260 H360" class="sch"/><text x="330" y="253" class="sch-s" text-anchor="middle" >sinal</text>
+<rect x="360" y="80" width="150" height="260" rx="4" class="sch-box"/><text x="435" y="205" class="sch-h" text-anchor="middle" >ESP32</text><text x="435" y="222" class="sch-s" text-anchor="middle" >DevKit V1</text>
+<text x="368" y="114" class="sch-pin" text-anchor="start" >VIN</text><text x="368" y="264" class="sch-pin" text-anchor="start" >D13</text><text x="368" y="304" class="sch-pin" text-anchor="start" >GND</text>
+<text x="502" y="114" class="sch-pin" text-anchor="end" >D5</text><text x="502" y="144" class="sch-pin" text-anchor="end" >D18</text><text x="502" y="284" class="sch-pin" text-anchor="end" >D19</text><text x="502" y="314" class="sch-pin" text-anchor="end" >D21</text>
+<path d="M360 110 H330" class="sch"/><path d="M330 110 V94 M321 94 H339" class="sch"/><text x="330" y="88" class="sch-t" text-anchor="middle" >5V</text><path d="M360 300 H330" class="sch"/><path d="M330 300 V312 M320 312 H340 M324 317 H336 M328 322 H332" class="sch"/>
+<rect x="740" y="80" width="130" height="90" rx="4" class="sch-box"/><text x="805" y="118" class="sch-h" text-anchor="middle" >HC-SR04</text><text x="805" y="134" class="sch-s" text-anchor="middle" >ENTRADA</text><text x="805" y="94" class="sch-pin" text-anchor="middle" >VCC</text><text x="805" y="164" class="sch-pin" text-anchor="middle" >GND</text><text x="748" y="114" class="sch-pin" text-anchor="start" >TRIG</text><text x="748" y="144" class="sch-pin" text-anchor="start" >ECHO</text><path d="M805 80 V64 M796 64 H814" class="sch"/><text x="805" y="58" class="sch-t" text-anchor="middle" >5V</text><path d="M805 170 V182 M795 182 H815 M799 187 H811 M803 192 H807" class="sch"/><path d="M510 110 H740" class="sch"/><path d="M740 140 H700" class="sch"/><path d="M700 140 H650" class="sch"/><rect x="657" y="134" width="36" height="12" class="sch-res"/><text x="675" y="129" class="sch-t" text-anchor="middle" >1 kΩ</text><path d="M650 140 H510" class="sch"/><circle cx="600" cy="140" r="3.5" class="sch-dot"/><text x="722" y="134" class="sch-s" text-anchor="middle" >5 V</text><text x="560" y="134" class="sch-acc" text-anchor="middle" >≈ 3,3 V</text><path d="M600 140 V210" class="sch"/><rect x="594" y="157" width="12" height="36" class="sch-res"/><text x="612" y="179" class="sch-t" text-anchor="start" >2 kΩ</text><path d="M600 210 V222 M590 222 H610 M594 227 H606 M598 232 H602" class="sch"/>
+<rect x="740" y="250" width="130" height="90" rx="4" class="sch-box"/><text x="805" y="288" class="sch-h" text-anchor="middle" >HC-SR04</text><text x="805" y="304" class="sch-s" text-anchor="middle" >SAÍDA</text><text x="805" y="264" class="sch-pin" text-anchor="middle" >VCC</text><text x="805" y="334" class="sch-pin" text-anchor="middle" >GND</text><text x="748" y="284" class="sch-pin" text-anchor="start" >TRIG</text><text x="748" y="314" class="sch-pin" text-anchor="start" >ECHO</text><path d="M805 250 V234 M796 234 H814" class="sch"/><text x="805" y="228" class="sch-t" text-anchor="middle" >5V</text><path d="M805 340 V352 M795 352 H815 M799 357 H811 M803 362 H807" class="sch"/><path d="M510 280 H740" class="sch"/><path d="M740 310 H700" class="sch"/><path d="M700 310 H650" class="sch"/><rect x="657" y="304" width="36" height="12" class="sch-res"/><text x="675" y="299" class="sch-t" text-anchor="middle" >1 kΩ</text><path d="M650 310 H510" class="sch"/><circle cx="600" cy="310" r="3.5" class="sch-dot"/><text x="722" y="304" class="sch-s" text-anchor="middle" >5 V</text><text x="560" y="304" class="sch-acc" text-anchor="middle" >≈ 3,3 V</text><path d="M600 310 V380" class="sch"/><rect x="594" y="327" width="12" height="36" class="sch-res"/><text x="612" y="349" class="sch-t" text-anchor="start" >2 kΩ</text><path d="M600 380 V392 M590 392 H610 M594 397 H606 M598 402 H602" class="sch"/>
+      </svg>
+    </div>
+    <figcaption>Todo símbolo 5V é o trilho +, e todo símbolo de terra é o trilho −, nas duas placas.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>Ordem de montagem</h2>
+  <ol class="steps">
+    <li>Encaixe a MB102 na ponta da Placa A e ponha os dois jumpers em 5V. Deixe a fonte desligada.</li>
+    <li>Faça as pontes dos trilhos da Placa A para a Placa B (vermelho no +, preto no −).</li>
+    <li>Encaixe o ESP32 atravessando as duas placas e ligue VIN e GND nos trilhos da Placa A.</li>
+    <li>Monte os dois divisores na Placa B (1 kΩ, 2 kΩ e o jumper da junção até D18 e D21).</li>
+    <li>Ligue os sensores: VCC, GND, TRIG direto no GPIO, ECHO na fileira do 1 kΩ.</li>
+    <li>Ligue o servo e o capacitor nos trilhos da Placa A, com o fio laranja no D13.</li>
+    <li>Confira a lista abaixo. Só então ligue a fonte na tomada e no jack da MB102: o LED verde dela acende.</li>
+    <li>Teste: com o cabo USB no notebook, abra o Monitor Serial (115200), digite <code>d</code> e ponha a mão a 5 cm de cada sensor. Deve aparecer cerca de 5 cm e “carro”.</li>
+  </ol>
+</section>
+
+<section>
+  <div class="tbl-head">
+    <h2>Checklist de ligações</h2>
+    <div style="display:flex;gap:10px;align-items:center">
+      <span class="count" id="contador" aria-live="polite">0 de 25 conferidas</span>
+      <button type="button" id="limpar">Desmarcar tudo</button>
+    </div>
+  </div>
+  <div class="tbl">
+    <table>
+      <thead><tr><th scope="col" aria-label="Conferido">✓</th><th scope="col">De</th><th scope="col">Para</th><th scope="col">Placa</th><th scope="col">Fio</th></tr></thead>
+      <tbody>
+<tr class="grp"><th colspan="5" scope="colgroup">Alimentação</th></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-1" aria-label="Conferido: MB102 · os dois jumpers amarelos"></td><td>MB102 · os dois jumpers amarelos</td><td>posição 5V</td><td class="pl">—</td><td><span class="muted">—</span></td></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-2" aria-label="Conferido: Fonte 9 V 1 A"></td><td>Fonte 9 V 1 A</td><td>jack P4 da MB102 (por último, depois de conferir tudo)</td><td class="pl">—</td><td><span class="muted">—</span></td></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-3" aria-label="Conferido: Trilho + da Placa A"></td><td>Trilho + da Placa A</td><td>trilho + da Placa B</td><td class="pl">A → B</td><td><span class="chip"><i class="sw v5"></i>vermelho</span></td></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-4" aria-label="Conferido: Trilho − da Placa A"></td><td>Trilho − da Placa A</td><td>trilho − da Placa B</td><td class="pl">A → B</td><td><span class="chip"><i class="sw gnd"></i>preto</span></td></tr>
+<tr class="grp"><th colspan="5" scope="colgroup">ESP32</th></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-5" aria-label="Conferido: ESP32 · VIN"></td><td>ESP32 · VIN</td><td>trilho +</td><td class="pl">A</td><td><span class="chip"><i class="sw v5"></i>vermelho</span></td></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-6" aria-label="Conferido: ESP32 · GND (ao lado do VIN)"></td><td>ESP32 · GND (ao lado do VIN)</td><td>trilho −</td><td class="pl">A</td><td><span class="chip"><i class="sw gnd"></i>preto</span></td></tr>
+<tr class="grp"><th colspan="5" scope="colgroup">Servo (cancela)</th></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-7" aria-label="Conferido: Servo · fio vermelho"></td><td>Servo · fio vermelho</td><td>trilho +</td><td class="pl">A</td><td><span class="chip"><i class="sw v5"></i>vermelho (do servo)</span></td></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-8" aria-label="Conferido: Servo · fio marrom"></td><td>Servo · fio marrom</td><td>trilho −</td><td class="pl">A</td><td><span class="chip"><i class="sw brown"></i>marrom (do servo)</span></td></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-9" aria-label="Conferido: Servo · fio laranja"></td><td>Servo · fio laranja</td><td>D13 (GPIO 13)</td><td class="pl">A</td><td><span class="chip"><i class="sw sig"></i>laranja (do servo)</span></td></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-10" aria-label="Conferido: Capacitor · perna longa (+)"></td><td>Capacitor · perna longa (+)</td><td>trilho +</td><td class="pl">A</td><td><span class="muted">capacitor</span></td></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-11" aria-label="Conferido: Capacitor · perna da faixa (−)"></td><td>Capacitor · perna da faixa (−)</td><td>trilho −</td><td class="pl">A</td><td><span class="muted">capacitor</span></td></tr>
+<tr class="grp"><th colspan="5" scope="colgroup">Sensor de entrada</th></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-12" aria-label="Conferido: HC-SR04 entrada · VCC"></td><td>HC-SR04 entrada · VCC</td><td>trilho +</td><td class="pl">B</td><td><span class="chip"><i class="sw v5"></i>vermelho</span></td></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-13" aria-label="Conferido: HC-SR04 entrada · GND"></td><td>HC-SR04 entrada · GND</td><td>trilho −</td><td class="pl">B</td><td><span class="chip"><i class="sw gnd"></i>preto</span></td></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-14" aria-label="Conferido: HC-SR04 entrada · TRIG"></td><td>HC-SR04 entrada · TRIG</td><td>D5 (GPIO 5)</td><td class="pl">B</td><td><span class="chip"><i class="sw trig"></i>amarelo</span></td></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-15" aria-label="Conferido: HC-SR04 entrada · ECHO"></td><td>HC-SR04 entrada · ECHO</td><td>fileira do ECHO, junto do 1 kΩ</td><td class="pl">B</td><td><span class="chip"><i class="sw echo"></i>verde</span></td></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-16" aria-label="Conferido: 1 kΩ (marrom-preto-vermelho)"></td><td>1 kΩ (marrom-preto-vermelho)</td><td>fileira do ECHO ↔ junção J1</td><td class="pl">B</td><td><span class="muted">resistor</span></td></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-17" aria-label="Conferido: Jumper da junção J1"></td><td>Jumper da junção J1</td><td>fileira do D18 (GPIO 18)</td><td class="pl">B</td><td><span class="chip"><i class="sw echo"></i>verde</span></td></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-18" aria-label="Conferido: 2 kΩ (vermelho-preto-vermelho)"></td><td>2 kΩ (vermelho-preto-vermelho)</td><td>junção J1 ↔ trilho −</td><td class="pl">B</td><td><span class="muted">resistor</span></td></tr>
+<tr class="grp"><th colspan="5" scope="colgroup">Sensor de saída</th></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-19" aria-label="Conferido: HC-SR04 saída · VCC"></td><td>HC-SR04 saída · VCC</td><td>trilho +</td><td class="pl">B</td><td><span class="chip"><i class="sw v5"></i>vermelho</span></td></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-20" aria-label="Conferido: HC-SR04 saída · GND"></td><td>HC-SR04 saída · GND</td><td>trilho −</td><td class="pl">B</td><td><span class="chip"><i class="sw gnd"></i>preto</span></td></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-21" aria-label="Conferido: HC-SR04 saída · TRIG"></td><td>HC-SR04 saída · TRIG</td><td>D19 (GPIO 19)</td><td class="pl">B</td><td><span class="chip"><i class="sw trig"></i>amarelo</span></td></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-22" aria-label="Conferido: HC-SR04 saída · ECHO"></td><td>HC-SR04 saída · ECHO</td><td>fileira do ECHO, junto do 1 kΩ</td><td class="pl">B</td><td><span class="chip"><i class="sw echo"></i>verde</span></td></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-23" aria-label="Conferido: 1 kΩ (marrom-preto-vermelho)"></td><td>1 kΩ (marrom-preto-vermelho)</td><td>fileira do ECHO ↔ junção J2</td><td class="pl">B</td><td><span class="muted">resistor</span></td></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-24" aria-label="Conferido: Jumper da junção J2"></td><td>Jumper da junção J2</td><td>fileira do D21 (GPIO 21)</td><td class="pl">B</td><td><span class="chip"><i class="sw echo"></i>verde</span></td></tr>
+<tr><td class="ck"><input type="checkbox" id="lig-25" aria-label="Conferido: 2 kΩ (vermelho-preto-vermelho)"></td><td>2 kΩ (vermelho-preto-vermelho)</td><td>junção J2 ↔ trilho −</td><td class="pl">B</td><td><span class="muted">resistor</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">As marcações ficam salvas só neste navegador. Se o ESP32 reiniciar quando a cancela se mexe, confira o capacitor e use uma fonte de pelo menos 1 A.</p>
+</section>
+</div>
+
+<script>
+(() => {
+  const KEY = 'ligacoes-cancela-v1';
+  const caixas = [...document.querySelectorAll('tbody input[type=checkbox]')];
+  const contador = document.getElementById('contador');
+  let salvo = {};
+  try { salvo = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { salvo = {}; }
+  const atualizar = () => {
+    const feitas = caixas.filter((c) => c.checked).length;
+    contador.textContent = feitas + ' de ' + caixas.length + ' conferidas';
+  };
+  const gravar = () => {
+    const estado = {};
+    caixas.forEach((c) => { if (c.checked) estado[c.id] = 1; });
+    try { localStorage.setItem(KEY, JSON.stringify(estado)); } catch {}
+  };
+  caixas.forEach((c) => {
+    if (salvo[c.id]) c.checked = true;
+    c.addEventListener('change', () => { atualizar(); gravar(); });
+  });
+  document.getElementById('limpar').addEventListener('click', () => {
+    caixas.forEach((c) => { c.checked = false; });
+    atualizar(); gravar();
+  });
+  atualizar();
+})();
+</script>
